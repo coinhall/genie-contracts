@@ -4,6 +4,8 @@ The factory contract can perform creation of airdrop contract.
 
 ## InstantiateMsg
 
+Creating a factory contract.
+
 ```json
 {
   "airdrop_code_id": 123,
@@ -26,6 +28,8 @@ The factory contract can perform creation of airdrop contract.
 ```
 
 ### `create_airdrop`
+
+Creating an airdrop contract using the factory.
 
 ```json
 {

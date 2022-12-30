@@ -29,7 +29,11 @@ The Airdrop contract facilitates direct claiming of CW20 tokens airdropped to us
 
 ## Prerequisites
 
-You will need Rust 1.44.1+ with wasm32-unknown-unknown target installed.
+- You will need [Rust](https://www.rust-lang.org/tools/install) 1.44.1+ with wasm32-unknown-unknown target installed.
+
+- [Docker](https://docs.docker.com/get-docker/) will be needed for compiling for the blockchain and ensuring the builds are the same for checksum comparison.
+
+- Install wasm32-unknown-unknown for rust
 
 ```
 rustc --version
@@ -52,6 +56,7 @@ cargo wasm
 Or for a blockchain-ready (compressed) build, run the following from the repository root:
 
 ```
+# Copy this or you can just run ./build.sh
 docker run --rm -v "$(pwd)":/code \
   --mount type=volume,source="$(basename "$(pwd)")_cache",target=/code/target \
   --mount type=volume,source=registry_cache,target=/usr/local/cargo/registry \
