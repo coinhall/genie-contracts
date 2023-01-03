@@ -20,8 +20,8 @@ const USER_PHRASE = process.env.USER_PHRASE;
 const PUBLICKEY = process.env.PUBLICKEY;
 const PRIVATEKEY = process.env.PRIVATEKEY;
 
-const FACTORY_CONTRACT = "genie-factory-v1-terra2";
-const CONTRACT = "genie-v1-terra2";
+const FACTORY_CONTRACT = "genie-airdrop-factory";
+const CONTRACT = "genie-airdrop";
 const TOKEN_CONTRACT =
   "terra167dsqkh2alurx997wmycw9ydkyu54gyswe3ygmrs4lwume3vmwks8ruqnv";
 const asset_info = {
@@ -94,8 +94,6 @@ const file = fs.readFileSync(
     __dirname,
     "..",
     "..",
-    "..",
-    CONTRACT,
     "artifacts",
     CONTRACT.replace(/-/g, "_") + "-aarch64" + ".wasm"
   )
