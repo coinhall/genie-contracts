@@ -35,7 +35,6 @@ var __generator = (this && this.__generator) || function (thisArg, body) {
         if (op[0] & 5) throw op[1]; return { value: op[0] ? op[1] : void 0, done: true };
     }
 };
-var _a, _b, _c;
 exports.__esModule = true;
 var feather_js_1 = require("@terra-money/feather.js");
 var process = require("process");
@@ -43,22 +42,27 @@ var fs = require("fs");
 var path = require("path");
 var secp256k1 = require("secp256k1");
 var keccak256_1 = require("keccak256");
-console.log("Example usage: yarn start src/test.ts --mainnet");
+console.log("Example usage: yarn start src/test.ts --m1");
+var IS_M1 = process.argv[2] === "--m1";
+var M1_MODIFIER = IS_M1 ? "-aarch64" : "";
 var SEED_PHRASE = process.env.SEED_PHRASE;
 var PROTOCOL_PHRASE = process.env.PROTOCOL_PHRASE;
 var USER_PHRASE = process.env.USER_PHRASE;
 var PUBLICKEY = process.env.PUBLICKEY;
 var PRIVATEKEY = process.env.PRIVATEKEY;
-// const IS_MAINNET = process.argv[2] === "--mainnet";
-var FACTORY_CONTRACT = "genie-factory-v1-terra2";
-var CONTRACT = "genie-v1-terra2";
+var FACTORY_CONTRACT = "genie-airdrop-factory";
+var CONTRACT = "genie-airdrop";
 var TOKEN_CONTRACT = "terra167dsqkh2alurx997wmycw9ydkyu54gyswe3ygmrs4lwume3vmwks8ruqnv";
-var ASSET = {
+var asset_info = {
     token: {
         contract_addr: TOKEN_CONTRACT
     }
 };
-var TO_TIMESTAMP = 1933046400;
+var asset_info_luna = {
+    native_token: {
+        denom: "uluna"
+    }
+};
 if (!SEED_PHRASE) {
     console.log("Missing SEED_PHRASE env var");
     process.exit(1);
@@ -68,7 +72,7 @@ if (!PROTOCOL_PHRASE) {
     process.exit(1);
 }
 if (!USER_PHRASE) {
-    console.log("Missing PROTOCOL_PHRASE env var");
+    console.log("Missing USER_PHRASE env var");
     process.exit(1);
 }
 if (!PRIVATEKEY) {
@@ -80,7 +84,6 @@ if (!PUBLICKEY) {
     process.exit(1);
 }
 var terra = new feather_js_1.LCDClient({
-    // key must be the chainID
     "pisco-1": {
         lcd: "https://pisco-lcd.terra.dev",
         chainID: "pisco-1",
@@ -92,7 +95,7 @@ var terra = new feather_js_1.LCDClient({
 var key = new feather_js_1.MnemonicKey({
     mnemonic: SEED_PHRASE
 });
-var wallet = terra.wallet(key);
+var hallwallet = terra.wallet(key);
 var key2 = new feather_js_1.MnemonicKey({
     mnemonic: PROTOCOL_PHRASE
 });
@@ -101,19 +104,16 @@ var key3 = new feather_js_1.MnemonicKey({
     mnemonic: USER_PHRASE
 });
 var userWallet = terra.wallet(key3);
-var walletAddress = (_a = wallet.key.accAddress("terra")) !== null && _a !== void 0 ? _a : "";
-var protocolAddress = (_b = protocolWallet.key.accAddress("terra")) !== null && _b !== void 0 ? _b : "";
-var userAddress = (_c = userWallet.key.accAddress("terra")) !== null && _c !== void 0 ? _c : "";
-var factoryFile = fs.readFileSync(path.resolve(__dirname, "..", "..", "artifacts", FACTORY_CONTRACT.replace(/-/g, "_") + "-aarch64" + ".wasm"));
-var file = fs.readFileSync(path.resolve(__dirname, "..", "..", "..", CONTRACT, "artifacts", CONTRACT.replace(/-/g, "_") + "-aarch64" + ".wasm"));
-function uploadContract() {
+var factoryFile = fs.readFileSync(path.resolve(__dirname, "..", "..", "artifacts", FACTORY_CONTRACT.replace(/-/g, "_") + M1_MODIFIER + ".wasm"));
+var file = fs.readFileSync(path.resolve(__dirname, "..", "..", "artifacts", CONTRACT.replace(/-/g, "_") + M1_MODIFIER + ".wasm"));
+function uploadContract(wallet) {
     return __awaiter(this, void 0, void 0, function () {
         var uploadFactory, upload, tx, res, factoryCode, contractCode;
         return __generator(this, function (_a) {
             switch (_a.label) {
                 case 0:
-                    uploadFactory = new feather_js_1.MsgStoreCode(walletAddress, Buffer.from(factoryFile).toString("base64"));
-                    upload = new feather_js_1.MsgStoreCode(walletAddress, Buffer.from(file).toString("base64"));
+                    uploadFactory = new feather_js_1.MsgStoreCode(wallet.key.accAddress("terra"), Buffer.from(factoryFile).toString("base64"));
+                    upload = new feather_js_1.MsgStoreCode(wallet.key.accAddress("terra"), Buffer.from(file).toString("base64"));
                     return [4 /*yield*/, wallet.createAndSignTx({
                             msgs: [uploadFactory, upload],
                             chainID: "pisco-1"
@@ -135,14 +135,14 @@ function uploadContract() {
         });
     });
 }
-function instantiateFactory(factoryCode, contractCode) {
+function instantiateFactory(wallet, factoryCode, contractCode) {
     return __awaiter(this, void 0, void 0, function () {
         var initMsg, instantiateFactory, tx, res, factoryContract;
         return __generator(this, function (_a) {
             switch (_a.label) {
                 case 0:
                     initMsg = { airdrop_code_id: contractCode, public_key: PUBLICKEY };
-                    instantiateFactory = new feather_js_1.MsgInstantiateContract(walletAddress, undefined, factoryCode, initMsg, {}, "factory");
+                    instantiateFactory = new feather_js_1.MsgInstantiateContract(wallet.key.accAddress("terra"), undefined, factoryCode, initMsg, {}, "factory");
                     return [4 /*yield*/, wallet.createAndSignTx({
                             msgs: [instantiateFactory],
                             chainID: "pisco-1"
@@ -155,7 +155,7 @@ function instantiateFactory(factoryCode, contractCode) {
                 case 2:
                     res = _a.sent();
                     console.log(res);
-                    factoryContract = res.logs[0].events[1].attributes[0].value;
+                    factoryContract = res.logs[0].events[0].attributes[0].value;
                     console.log("factoryContract", factoryContract);
                     return [2 /*return*/, factoryContract];
             }
@@ -170,10 +170,10 @@ function createAirdrop(wallet, factoryContract, asset, allocated_amount, from_ti
                 case 0:
                     createAirdrop = new feather_js_1.MsgExecuteContract(wallet.key.accAddress("terra"), factoryContract, {
                         create_airdrop: {
-                            asset: asset,
-                            to_timestamp: to_timestamp.toString(),
-                            from_timestamp: from_timestamp.toString,
-                            allocated_amount: allocated_amount
+                            asset_info: asset,
+                            from_timestamp: from_timestamp,
+                            to_timestamp: to_timestamp,
+                            allocated_amount: allocated_amount.toString()
                         }
                     }, {});
                     return [4 /*yield*/, wallet.createAndSignTx({
@@ -195,21 +195,36 @@ function createAirdrop(wallet, factoryContract, asset, allocated_amount, from_ti
         });
     });
 }
-function increaseIncentives(wallet, asset, amount, airdropContract) {
+function increaseIncentives(wallet, token_contract, amount, airdropContract) {
     return __awaiter(this, void 0, void 0, function () {
-        var astroSend, sendTokens;
+        var astroSend, sendTokens, tx, res;
         return __generator(this, function (_a) {
-            astroSend = {
-                send: {
-                    recipient: airdropContract,
-                    amount: amount.toString()
-                }
-            };
-            sendTokens = new feather_js_1.MsgExecuteContract(wallet.key.accAddress("terra"), TOKEN_CONTRACT, astroSend, {});
-            return [2 /*return*/, wallet.createAndSignTx({
-                    msgs: [sendTokens],
-                    chainID: "pisco-1"
-                })];
+            switch (_a.label) {
+                case 0:
+                    astroSend = {
+                        send: {
+                            contract: airdropContract,
+                            amount: amount.toString(),
+                            msg: Buffer.from(JSON.stringify({
+                                increase_incentives: {}
+                            })).toString("base64")
+                        }
+                    };
+                    sendTokens = new feather_js_1.MsgExecuteContract(wallet.key.accAddress("terra"), token_contract, astroSend, {});
+                    return [4 /*yield*/, wallet.createAndSignTx({
+                            msgs: [sendTokens],
+                            chainID: "pisco-1"
+                        })];
+                case 1:
+                    tx = _a.sent();
+                    console.log(tx);
+                    console.log("----------------------------------");
+                    return [4 /*yield*/, terra.tx.broadcast(tx, "pisco-1")];
+                case 2:
+                    res = _a.sent();
+                    console.log(res);
+                    return [2 /*return*/];
+            }
         });
     });
 }
@@ -221,7 +236,7 @@ function increaseLunaIncentives(wallet, airdropContract, amount) {
                 case 0:
                     increaseIncentives = new feather_js_1.MsgExecuteContract(wallet.key.accAddress("terra"), airdropContract, {
                         increase_incentives: {}
-                    }, { amount: amount });
+                    }, { uluna: amount.toString() });
                     return [4 /*yield*/, wallet.createAndSignTx({
                             msgs: [increaseIncentives],
                             chainID: "pisco-1"
@@ -246,7 +261,7 @@ function claim(wallet, airdropContract, amount) {
             switch (_a.label) {
                 case 0:
                     private_key = Buffer.from(PRIVATEKEY !== null && PRIVATEKEY !== void 0 ? PRIVATEKEY : "", "base64");
-                    account = userAddress;
+                    account = wallet.key.accAddress("terra");
                     claimsContract = airdropContract;
                     claimstr = account + "," + amount + "," + claimsContract;
                     msg = keccak256_1["default"](Buffer.from(claimstr));
@@ -255,9 +270,9 @@ function claim(wallet, airdropContract, amount) {
                     claim = new feather_js_1.MsgExecuteContract(wallet.key.accAddress("terra"), airdropContract, {
                         claim: {
                             signature: signature,
-                            amount: amount.toString()
+                            claim_amount: amount.toString()
                         }
-                    }, { amount: amount });
+                    }, {});
                     return [4 /*yield*/, wallet.createAndSignTx({
                             msgs: [claim],
                             chainID: "pisco-1"
@@ -282,7 +297,7 @@ function transferUnclaimedTokens(wallet, airdropContract, amount) {
             switch (_a.label) {
                 case 0:
                     transferUnclaimed = new feather_js_1.MsgExecuteContract(wallet.key.accAddress("terra"), airdropContract, {
-                        transfer_unclaimed: {
+                        transfer_unclaimed_tokens: {
                             amount: amount.toString(),
                             recipient: wallet.key.accAddress("terra")
                         }
@@ -304,293 +319,243 @@ function transferUnclaimedTokens(wallet, airdropContract, amount) {
         });
     });
 }
-test1()
-    .then(function (res) { return console.log(res); })["catch"](function (err) { return console.log(err); });
-function test1() {
+function wait(ms) {
     return __awaiter(this, void 0, void 0, function () {
-        var factoryContract, starttime, endtime, airdropContract, err_1;
+        return __generator(this, function (_a) {
+            return [2 /*return*/, new Promise(function (resolve) {
+                    setTimeout(resolve, ms);
+                })];
+        });
+    });
+}
+function waitUntil(s) {
+    return __awaiter(this, void 0, void 0, function () {
+        var timeUntil, waiting_time;
+        return __generator(this, function (_a) {
+            timeUntil = s * 1000;
+            console.log("timeUntil", timeUntil);
+            waiting_time = timeUntil - Date.now() > 0 ? timeUntil - Date.now() + 60000 : 60000;
+            // try to wait until RPC/LCD and feather.js is updated with a time in the future
+            // takes at least 1 minute to update properly
+            console.log("waiting_time", waiting_time);
+            return [2 /*return*/, new Promise(function (resolve) {
+                    setTimeout(resolve, waiting_time);
+                })];
+        });
+    });
+}
+testall();
+function testall() {
+    return __awaiter(this, void 0, void 0, function () {
+        var factoryContract;
+        var _this = this;
         return __generator(this, function (_a) {
             switch (_a.label) {
-                case 0: return [4 /*yield*/, uploadContract().then(function (res) {
-                        return instantiateFactory(res[0], res[1]);
-                    })];
+                case 0:
+                    console.log("UPLOADING CONTRACTS");
+                    return [4 /*yield*/, uploadContract(hallwallet).then(function (res) { return __awaiter(_this, void 0, void 0, function () {
+                            return __generator(this, function (_a) {
+                                switch (_a.label) {
+                                    case 0: return [4 /*yield*/, wait(6000)];
+                                    case 1:
+                                        _a.sent();
+                                        console.log("INSTANTIATING FACTORY");
+                                        return [2 /*return*/, instantiateFactory(hallwallet, res[0], res[1])];
+                                }
+                            });
+                        }); })];
                 case 1:
                     factoryContract = _a.sent();
-                    console.log("TESTING TEST 1");
-                    starttime = Math.trunc(Date.now() / 1000 + 30);
-                    endtime = Math.trunc(Date.now() / 1000 + 500);
-                    return [4 /*yield*/, createAirdrop(protocolWallet, factoryContract, ASSET, 5000000, starttime, endtime)];
+                    // const factoryContract =
+                    //   "terra13yd2sp8m9w92c35djuuy08856wflgum95cweq9zaxlwsvtyqc7hss68m26";
+                    return [4 /*yield*/, wait(6000)];
                 case 2:
-                    airdropContract = _a.sent();
-                    return [4 /*yield*/, increaseIncentives(protocolWallet, ASSET, 2000000, airdropContract)];
+                    // const factoryContract =
+                    //   "terra13yd2sp8m9w92c35djuuy08856wflgum95cweq9zaxlwsvtyqc7hss68m26";
+                    _a.sent();
+                    console.log("TESTING TEST 1");
+                    return [4 /*yield*/, test1(factoryContract)["catch"](function (err) {
+                            console.log(err);
+                        })];
                 case 3:
                     _a.sent();
-                    return [4 /*yield*/, increaseIncentives(protocolWallet, ASSET, 3000000, airdropContract)];
+                    return [4 /*yield*/, wait(6000)];
                 case 4:
                     _a.sent();
-                    _a.label = 5;
+                    console.log("TESTING TEST 2");
+                    return [4 /*yield*/, test2(factoryContract)["catch"](function (err) {
+                            console.log(err);
+                        })];
                 case 5:
-                    _a.trys.push([5, 7, , 8]);
-                    return [4 /*yield*/, transferUnclaimedTokens(protocolWallet, airdropContract, 5000000)];
+                    _a.sent();
+                    return [4 /*yield*/, wait(20000)];
                 case 6:
                     _a.sent();
-                    throw new Error("Error not thrown");
+                    console.log("TESTING TEST 3");
+                    return [4 /*yield*/, test3(factoryContract)["catch"](function (err) {
+                            console.log(err);
+                        })];
                 case 7:
-                    err_1 = _a.sent();
-                    if (err_1.message !== "Error not thrown")
-                        throw err_1;
-                    return [3 /*break*/, 8];
-                case 8: return [4 /*yield*/, new Promise(function (resolve) {
-                        setTimeout(resolve, starttime - Date.now() > 0 ? starttime - Date.now() : 0);
-                    })];
+                    _a.sent();
+                    console.log("DONE TESTING");
+                    return [2 /*return*/];
+            }
+        });
+    });
+}
+function test1(factoryContract) {
+    return __awaiter(this, void 0, void 0, function () {
+        var starttime, endtime, airdropContract;
+        return __generator(this, function (_a) {
+            switch (_a.label) {
+                case 0:
+                    starttime = Math.trunc(Date.now() / 1000 + 60);
+                    endtime = Math.trunc(Date.now() / 1000 + 500);
+                    return [4 /*yield*/, wait(6000)];
+                case 1:
+                    _a.sent();
+                    return [4 /*yield*/, createAirdrop(protocolWallet, factoryContract, asset_info, 5000000, starttime, endtime)];
+                case 2:
+                    airdropContract = _a.sent();
+                    return [4 /*yield*/, wait(6000)];
+                case 3:
+                    _a.sent();
+                    return [4 /*yield*/, increaseIncentives(protocolWallet, TOKEN_CONTRACT, 2000000, airdropContract)];
+                case 4:
+                    _a.sent();
+                    return [4 /*yield*/, increaseIncentives(protocolWallet, TOKEN_CONTRACT, 7000000, airdropContract)];
+                case 5:
+                    _a.sent();
+                    return [4 /*yield*/, wait(6000)];
+                case 6:
+                    _a.sent();
+                    return [4 /*yield*/, transferUnclaimedTokens(protocolWallet, airdropContract, 4000000)];
+                case 7:
+                    _a.sent();
+                    return [4 /*yield*/, waitUntil(starttime)];
+                case 8:
+                    _a.sent();
+                    return [4 /*yield*/, claim(userWallet, airdropContract, 2000000)];
                 case 9:
                     _a.sent();
-                    return [4 /*yield*/, claim(userWallet, airdropContract, 2000000)];
+                    return [4 /*yield*/, wait(6000)];
                 case 10:
-                    _a.sent();
-                    return [4 /*yield*/, claim(userWallet, airdropContract, 2000000)];
+                    _a.sent(); // Wait a bit for wallet nonce to update.
+                    return [4 /*yield*/, claim(userWallet, airdropContract, 2000000)
+                            .then(function (_) {
+                            throw new Error("Error not thrown");
+                        })["catch"](function (err) {
+                            if (err.message !== "Error not thrown") {
+                                console.log("error is thrown for double claim");
+                            }
+                            else {
+                                throw new Error("Error not thrown");
+                            }
+                        })];
                 case 11:
                     _a.sent();
                     return [4 /*yield*/, claim(protocolWallet, airdropContract, 4000000)];
                 case 12:
+                    _a.sent();
+                    return [4 /*yield*/, claim(hallwallet, airdropContract, 1000000)
+                            .then(function (_) {
+                            throw new Error("Error not thrown");
+                        })["catch"](function (err) {
+                            if (err.message !== "Error not thrown") {
+                                console.log("error is thrown for double claim");
+                            }
+                            else {
+                                throw new Error("Error not thrown");
+                            }
+                        })];
+                case 13:
                     _a.sent();
                     return [2 /*return*/, airdropContract];
             }
         });
     });
 }
-function test2() {
+function test2(factoryContract) {
     return __awaiter(this, void 0, void 0, function () {
-        var starttime, endtime, airdropContract, err_2, err_3;
+        var starttime, endtime, airdropContract;
         return __generator(this, function (_a) {
             switch (_a.label) {
                 case 0:
-                    starttime = Math.trunc(Date.now() / 1000 + 50);
-                    endtime = Math.trunc(Date.now() / 1000 + 100);
-                    return [4 /*yield*/, createAirdrop(protocolWallet, factoryContract, ASSET, 5000000, starttime, endtime)];
+                    starttime = Math.trunc(Date.now() / 1000 + 60);
+                    endtime = Math.trunc(Date.now() / 1000 + 600);
+                    return [4 /*yield*/, createAirdrop(protocolWallet, factoryContract, asset_info_luna, 5000000, starttime, endtime)];
                 case 1:
                     airdropContract = _a.sent();
-                    return [4 /*yield*/, increaseIncentives(protocolWallet, ASSET, 2000000, airdropContract)];
+                    wait(6000);
+                    return [4 /*yield*/, increaseLunaIncentives(protocolWallet, airdropContract, 2000000)];
                 case 2:
                     _a.sent();
-                    _a.label = 3;
+                    return [4 /*yield*/, claim(userWallet, airdropContract, 2000000)
+                            .then(function (_) {
+                            throw new Error("Error not thrown");
+                        })["catch"](function (err) {
+                            if (err.message !== "Error not thrown") {
+                                console.log("Error is thrown for claim before start");
+                            }
+                            else {
+                                throw new Error("Error not thrown");
+                            }
+                        })];
                 case 3:
-                    _a.trys.push([3, 5, , 6]);
-                    return [4 /*yield*/, claim(userWallet, airdropContract, 2000000)];
+                    _a.sent();
+                    return [4 /*yield*/, waitUntil(starttime)];
                 case 4:
                     _a.sent();
-                    throw new Error("Error not thrown");
+                    return [4 /*yield*/, claim(userWallet, airdropContract, 2000000)
+                            .then(function (_) {
+                            throw new Error("Error not thrown");
+                        })["catch"](function (err) {
+                            if (err.message !== "Error not thrown") {
+                                console.log("Error is thrown for being unable to claim due to no more tokens");
+                            }
+                            else {
+                                throw new Error("Error not thrown");
+                            }
+                        })];
                 case 5:
-                    err_2 = _a.sent();
-                    if (err_2.message !== "Error not thrown")
-                        throw err_2;
-                    return [3 /*break*/, 6];
-                case 6: return [4 /*yield*/, new Promise(function (resolve) {
-                        setTimeout(resolve, starttime * 1000 - Date.now() > 0 ? starttime * 1000 - Date.now() : 0);
-                    })];
-                case 7:
                     _a.sent();
-                    _a.label = 8;
-                case 8:
-                    _a.trys.push([8, 10, , 11]);
-                    return [4 /*yield*/, claim(userWallet, airdropContract, 2000000)];
-                case 9:
-                    _a.sent();
-                    throw new Error("Error not thrown");
-                case 10:
-                    err_3 = _a.sent();
-                    if (err_3.message !== "Error not thrown")
-                        throw err_3;
-                    return [3 /*break*/, 11];
-                case 11:
-                    transferUnclaimedTokens(protocolWallet, airdropContract, 5000000);
+                    transferUnclaimedTokens(protocolWallet, airdropContract, 2000000);
                     return [2 /*return*/];
             }
         });
     });
 }
-function test3() {
+function test3(factoryContract) {
     return __awaiter(this, void 0, void 0, function () {
         var starttime, endtime, airdropContract;
         return __generator(this, function (_a) {
             switch (_a.label) {
                 case 0:
                     starttime = Math.trunc(Date.now() / 1000 + 50);
-                    endtime = Math.trunc(Date.now() / 1000 + 100);
-                    return [4 /*yield*/, createAirdrop(protocolWallet, factoryContract, ASSET, 5000000, starttime, endtime)];
+                    endtime = Math.trunc(Date.now() / 1000 + 200);
+                    return [4 /*yield*/, createAirdrop(protocolWallet, factoryContract, asset_info, 5000000, starttime, endtime)];
                 case 1:
                     airdropContract = _a.sent();
-                    return [4 /*yield*/, increaseIncentives(protocolWallet, ASSET, 6000000, airdropContract)];
+                    return [4 /*yield*/, wait(6000)];
                 case 2:
                     _a.sent();
-                    return [4 /*yield*/, new Promise(function (resolve) {
-                            setTimeout(resolve, starttime * 1000 - Date.now() > 0 ? starttime * 1000 - Date.now() : 0);
-                        })];
+                    return [4 /*yield*/, increaseIncentives(protocolWallet, TOKEN_CONTRACT, 6000000, airdropContract)];
                 case 3:
                     _a.sent();
-                    return [4 /*yield*/, claim(userWallet, airdropContract, 2000000)];
+                    return [4 /*yield*/, waitUntil(starttime)];
                 case 4:
                     _a.sent();
-                    return [4 /*yield*/, new Promise(function (resolve) {
-                            setTimeout(resolve, endtime * 1000 - Date.now() > 0 ? endtime * 1000 - Date.now() + 1 : 0);
-                        })];
+                    return [4 /*yield*/, claim(userWallet, airdropContract, 2000000)];
                 case 5:
                     _a.sent();
-                    return [4 /*yield*/, transferUnclaimedTokens(protocolWallet, airdropContract, 5000000)];
+                    return [4 /*yield*/, waitUntil(endtime)];
                 case 6:
+                    _a.sent();
+                    return [4 /*yield*/, transferUnclaimedTokens(protocolWallet, airdropContract, 4000000)];
+                case 7:
                     _a.sent();
                     return [2 /*return*/];
             }
         });
     });
 }
-// const config = new AccessConfig(2, walletAddress);
-// const uploadFactory = new MsgStoreCode(
-//   walletAddress,
-//   Buffer.from(factoryFile).toString("base64")
-// );
-// const upload = new MsgStoreCode(
-//   walletAddress,
-//   Buffer.from(file).toString("base64"),
-//   config
-// );
-// wallet
-//   .createAndSignTx({
-//     msgs: [uploadFactory, upload],
-//     chainID: "pisco-1",
-//   })
-//   .then((tx) => {
-//     console.log(tx);
-//     console.log("----------------------------------");
-//     return terra.tx.broadcast(tx, "pisco-1");
-//   })
-//   .then((res) => {
-//     console.log(res);
-//     const factoryCode = parseInt(res.logs[0].events[1].attributes[0].value);
-//     const contractCode = parseInt(res.logs[1].events[1].attributes[0].value);
-//     console.log("factoryCode", factoryCode);
-//     console.log("contractCode", contractCode);
-//     return [factoryCode, contractCode];
-//   })
-//   .then(([factoryCode, contractCode]) => {
-//     const initMsg = { airdrop_code_id: contractCode, public_key: PUBLICKEY };
-//     const instantiateFactory = new MsgInstantiateContract(
-//       walletAddress,
-//       undefined,
-//       factoryCode,
-//       initMsg,
-//       {},
-//       "factory"
-//     );
-//     return wallet.createAndSignTx({
-//       msgs: [instantiateFactory],
-//       chainID: "pisco-1",
-//     });
-//   })
-//   .then((tx) => {
-//     console.log(tx);
-//     console.log("----------------------------------");
-//     return terra.tx.broadcast(tx, "pisco-1");
-//   })
-//   .then((res) => {
-//     console.log(res);
-//     const factoryContract = res.logs[0].events[0].attributes[0].value;
-//     console.log("factoryContract", factoryContract);
-//     return factoryContract;
-//   })
-//   .then((factoryContract) => {
-//     const createAirdropMessage = {
-//       create_airdrop: {
-//         asset_info: ASSET,
-//         to_timestamp: TO_TIMESTAMP,
-//         from_timestamp: Math.trunc(Date.now() / 1000),
-//         allocated_amount: "5000000",
-//       },
-//     };
-//     const createAirdrop = new MsgExecuteContract(
-//       protocolAddress,
-//       factoryContract,
-//       createAirdropMessage,
-//       {}
-//     );
-//     return protocolWallet.createAndSignTx({
-//       msgs: [createAirdrop],
-//       chainID: "pisco-1",
-//     });
-//   })
-//   .then((tx) => {
-//     console.log(tx);
-//     console.log("----------------------------------");
-//     return terra.tx.broadcast(tx, "pisco-1");
-//   })
-//   .then((tx) => {
-//     console.log(tx);
-//     const airdropContract = tx.logs[0].events[1].attributes[0].value;
-//     console.log(airdropContract);
-//     return airdropContract;
-//   })
-//   .then((airdropContract) => {
-//     const astroSend = {
-//       send: {
-//         recipient: airdropContract,
-//         amount: "5000000",
-//       },
-//     };
-//     const sendTokens = new MsgExecuteContract(
-//       protocolAddress,
-//       TOKEN_CONTRACT,
-//       astroSend,
-//       {}
-//     );
-//     return protocolWallet.createAndSignTx({
-//       msgs: [sendTokens],
-//       chainID: "pisco-1",
-//     });
-//   })
-//   .then((tx) => {
-//     console.log(tx);
-//     console.log("----------------------------------");
-//     return terra.tx.broadcast(tx, "pisco-1");
-//   })
-//   .then((res) => {
-//     console.log(res);
-//     console.log("5 tokens sent to airdrop contract");
-//     return res.logs[0].events[2].attributes[3].value;
-//   })
-//   .then((airdropContract) => {
-//     const private_key = Buffer.from(PRIVATEKEY, "base64");
-//     const account = userAddress;
-//     const claimsContract = airdropContract;
-//     const amount = 5000000;
-//     const claim = account + "," + amount + "," + claimsContract;
-//     const msg = keccak256(Buffer.from(claim));
-//     const sigObj = secp256k1.ecdsaSign(msg, private_key);
-//     const signature = Buffer.from(sigObj.signature).toString("base64");
-//     const claim_info = {
-//       claim: {
-//         claim_amount: amount.toString(),
-//         signature: signature,
-//       },
-//     };
-//     const claimMsg = new MsgExecuteContract(
-//       userAddress,
-//       claimsContract,
-//       claim_info,
-//       {}
-//     );
-//     return userWallet.createAndSignTx({
-//       msgs: [claimMsg],
-//       chainID: "pisco-1",
-//     });
-//   })
-//   .then((tx) => {
-//     console.log(tx);
-//     console.log("----------------------------------");
-//     return terra.tx.broadcast(tx, "pisco-1");
-//   })
-//   .then((res) => {
-//     console.log(res);
-//   })
-//   .catch((err) => {
-//     console.log(err);
-//   });

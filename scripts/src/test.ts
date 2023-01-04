@@ -12,7 +12,10 @@ import * as path from "path";
 import * as secp256k1 from "secp256k1";
 import keccak256 from "keccak256";
 
-console.log("Example usage: yarn start src/test.ts");
+console.log("Example usage: yarn start src/test.ts --m1");
+
+const IS_M1 = process.argv[2] === "--m1";
+const M1_MODIFIER = IS_M1 ? "-aarch64" : "";
 
 const SEED_PHRASE = process.env.SEED_PHRASE;
 const PROTOCOL_PHRASE = process.env.PROTOCOL_PHRASE;
@@ -57,13 +60,12 @@ if (!PUBLICKEY) {
 }
 
 const terra = new LCDClient({
-  // key must be the chainID
   "pisco-1": {
     lcd: "https://pisco-lcd.terra.dev",
     chainID: "pisco-1",
     gasAdjustment: 1.75,
     gasPrices: { uluna: 0.015 },
-    prefix: "terra", // bech32 prefix, used by the LCD to understand which is the right chain to query
+    prefix: "terra",
   },
 });
 
@@ -86,7 +88,7 @@ const factoryFile = fs.readFileSync(
     "..",
     "..",
     "artifacts",
-    FACTORY_CONTRACT.replace(/-/g, "_") + "-aarch64" + ".wasm"
+    FACTORY_CONTRACT.replace(/-/g, "_") + M1_MODIFIER + ".wasm"
   )
 );
 const file = fs.readFileSync(
@@ -95,7 +97,7 @@ const file = fs.readFileSync(
     "..",
     "..",
     "artifacts",
-    CONTRACT.replace(/-/g, "_") + "-aarch64" + ".wasm"
+    CONTRACT.replace(/-/g, "_") + M1_MODIFIER + ".wasm"
   )
 );
 async function uploadContract(wallet: Wallet) {
