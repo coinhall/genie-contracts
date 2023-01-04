@@ -12,17 +12,26 @@ PRIVATEKEY = matching+secp256k1PublicKey+in/Base64
 
 Go to https://faucet.terra.money and make sure all these 3 wallets have some amount of testnet luna in them. Also, head to https://app.astroport.fi/swap, change to testnet wallet, and swap for some astro tokens on the testnet (>100 astro is enough) on the protocol wallet.
 
+### [Generating a private key]()
+
 For publickey, privatekey pair, DO NOT use the key pair below on mainnet.
 
-```
-PUBLICKEY = A59iiunFlPQJGnIWvgJlUIcADoSDHZ4ROcZIYhldJfvD
-PRIVATEKEY = /QH1Vgg0kk/S0xip2zLyW0uaHFfcYln6N6MmOnoIJBI=
+```bash
+yarn start src/keygen.ts
+#  Generating private key...
+#  PUBLICKEY = A59iiunFlPQJGnIWvgJlUIcADoSDHZ4ROcZIYhldJfvD
+#  PRIVATEKEY = /QH1Vgg0kk/S0xip2zLyW0uaHFfcYln6N6MmOnoIJBI=
+
+# !! DO NOT USE THESE 2 KEYS ON THE MAINNET
 ```
 
-# Run
+## Run
+
+Node 14++ required.
 
 To run:
 
 ```
+# Make sure the wasm files are in the artifacts folder, run build.sh
 yarn start src/test.ts
 ```

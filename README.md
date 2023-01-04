@@ -1,4 +1,6 @@
-# Airdrop
+# Genie Airdrop
+
+(coming soon on [genie.coinhall.org](https://genie.coinhall.org))
 
 The Airdrop contract facilitates direct claiming of CW20 tokens airdropped to users who participate in genie campaigns
 
@@ -9,7 +11,7 @@ The Airdrop contract facilitates direct claiming of CW20 tokens airdropped to us
 | [`genie-airdrop_factory`](contracts/airdrop-factory) | Factory contract for creating airdrops |
 | [`genie-airdrop`](contracts/airdrop)                 | Genie airdrop contract                 |
 
-- terraswap_factory
+- genie_airdrop_factory
 
   Mainnet: `terraAbc12312312312312312312312312312312312312312312311231231231`
 
@@ -19,11 +21,18 @@ The Airdrop contract facilitates direct claiming of CW20 tokens airdropped to us
 
   Testnet (CodeID): xxxx
 
-- terraswap_pair
+- genie_airdrop
 
   Mainnet (CodeID): xxx
 
   Testnet (CodeID): xxxx
+
+## Scripts
+
+| Name                            | Description                                                             |
+| ------------------------------- | ----------------------------------------------------------------------- |
+| [`test`](scripts/src/test.ts)   | Test script to upload, instantiate and try out the contracts on testnet |
+| [`keygen`](scripts/src/test.ts) | Script to generate public and private secp256k1 keys                    |
 
 # Running this contract
 
@@ -60,7 +69,7 @@ Or for a blockchain-ready (compressed) build, run the following from the reposit
 docker run --rm -v "$(pwd)":/code \
   --mount type=volume,source="$(basename "$(pwd)")_cache",target=/code/target \
   --mount type=volume,source=registry_cache,target=/usr/local/cargo/registry \
-  cosmwasm/workspace-optimizer:0.12.6
+  cosmwasm/workspace-optimizer:0.12.11
 ```
 
 The optimized contracts and checksums are generated in the artifacts/ directory.
