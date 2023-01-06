@@ -6,18 +6,7 @@ use cw20::{BalanceResponse, Cw20ExecuteMsg, Cw20QueryMsg};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-/// Returns a lowercased, validated address upon success.
-pub fn addr_validate_to_lower(api: &dyn Api, addr: impl Into<String>) -> StdResult<Addr> {
-    let addr = addr.into();
-    if addr.to_lowercase() != addr {
-        return Err(StdError::generic_err(format!(
-            "Address {} should be lowercase",
-            addr
-        )));
-    }
-    api.addr_validate(&addr)
-}
-
+/// A wrapper to represent both native coins and cw20 tokens as a single type
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum AssetInfo {
@@ -34,64 +23,21 @@ impl AssetInfo {
     }
 }
 
+/// Queries the balance of `asset` in `account_addr`
 pub fn query_balance(
     querier: &QuerierWrapper,
-    asset: &AssetInfo,
     account_addr: &Addr,
+    asset: &AssetInfo,
 ) -> StdResult<Uint128> {
     match asset {
         AssetInfo::Token { contract_addr } => {
-            cw20_get_balance(querier, contract_addr, account_addr)
+            get_cw20_balance(querier, account_addr, contract_addr)
         }
-        AssetInfo::NativeToken { denom } => native_get_balance(querier, account_addr, denom),
+        AssetInfo::NativeToken { denom } => get_native_balance(querier, account_addr, denom),
     }
 }
 
-pub fn build_transfer_asset_msg(
-    receipient: &Addr,
-    asset: &AssetInfo,
-    amount: Uint128,
-) -> StdResult<CosmosMsg> {
-    match asset {
-        AssetInfo::Token { contract_addr } => {
-            build_transfer_cw20_token_msg(receipient, &contract_addr.to_string(), amount)
-        }
-        AssetInfo::NativeToken { denom } => {
-            build_transfer_native_token_msg(receipient, &denom, amount)
-        }
-    }
-}
-
-pub fn build_transfer_native_token_msg(
-    recipient: &Addr,
-    denom: &String,
-    amount: Uint128,
-) -> StdResult<CosmosMsg> {
-    Ok(CosmosMsg::Bank(BankMsg::Send {
-        to_address: recipient.into(),
-        amount: vec![Coin {
-            denom: denom.clone(),
-            amount,
-        }],
-    }))
-}
-
-pub fn build_transfer_cw20_token_msg(
-    recipient: &Addr,
-    token_contract_address: &String,
-    amount: Uint128,
-) -> StdResult<CosmosMsg> {
-    Ok(CosmosMsg::Wasm(WasmMsg::Execute {
-        contract_addr: token_contract_address.clone(),
-        msg: to_binary(&Cw20ExecuteMsg::Transfer {
-            recipient: recipient.into(),
-            amount,
-        })?,
-        funds: vec![],
-    }))
-}
-
-pub fn native_get_balance(
+fn get_native_balance(
     querier: &QuerierWrapper,
     account_addr: &Addr,
     denom: &String,
@@ -108,10 +54,10 @@ pub fn native_get_balance(
         .unwrap_or_default())
 }
 
-pub fn cw20_get_balance(
+fn get_cw20_balance(
     querier: &QuerierWrapper,
-    token_address: &Addr,
     account_addr: &Addr,
+    token_address: &Addr,
 ) -> StdResult<Uint128> {
     let query: BalanceResponse = querier.query(&QueryRequest::Wasm(WasmQuery::Smart {
         contract_addr: token_address.into(),
@@ -121,4 +67,49 @@ pub fn cw20_get_balance(
     }))?;
 
     Ok(query.balance)
+}
+
+/// Builds the transfer message for a given `asset`
+pub fn build_transfer_asset_msg(
+    receipient: &Addr,
+    asset: &AssetInfo,
+    amount: Uint128,
+) -> StdResult<CosmosMsg> {
+    match asset {
+        AssetInfo::Token { contract_addr } => {
+            build_transfer_cw20_token_msg(receipient, &contract_addr.to_string(), amount)
+        }
+        AssetInfo::NativeToken { denom } => {
+            build_transfer_native_token_msg(receipient, &denom, amount)
+        }
+    }
+}
+
+fn build_transfer_native_token_msg(
+    recipient: &Addr,
+    denom: &String,
+    amount: Uint128,
+) -> StdResult<CosmosMsg> {
+    Ok(CosmosMsg::Bank(BankMsg::Send {
+        to_address: recipient.into(),
+        amount: vec![Coin {
+            denom: denom.clone(),
+            amount,
+        }],
+    }))
+}
+
+fn build_transfer_cw20_token_msg(
+    recipient: &Addr,
+    token_contract_address: &String,
+    amount: Uint128,
+) -> StdResult<CosmosMsg> {
+    Ok(CosmosMsg::Wasm(WasmMsg::Execute {
+        contract_addr: token_contract_address.clone(),
+        msg: to_binary(&Cw20ExecuteMsg::Transfer {
+            recipient: recipient.into(),
+            amount,
+        })?,
+        funds: vec![],
+    }))
 }

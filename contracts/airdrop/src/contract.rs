@@ -10,7 +10,7 @@ use cosmwasm_std::{
 };
 use cw2::set_contract_version;
 use cw20::Cw20ReceiveMsg;
-use genie::asset::{addr_validate_to_lower, build_transfer_asset_msg, query_balance, AssetInfo};
+use genie::asset::{build_transfer_asset_msg, query_balance, AssetInfo};
 
 const CONTRACT_NAME: &str = "genie";
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -23,15 +23,13 @@ pub fn instantiate(
     msg: InstantiateMsg,
 ) -> StdResult<Response> {
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
-
     if msg.to_timestamp <= msg.from_timestamp {
         return Err(StdError::generic_err(
             "Invalid airdrop claim window closure timestamp",
         ));
     }
 
-    let owner = addr_validate_to_lower(deps.api, msg.owner)?;
-
+    let owner = deps.api.addr_validate(&msg.owner)?;
     let config = Config {
         owner,
         asset: msg.asset,
@@ -39,11 +37,9 @@ pub fn instantiate(
         to_timestamp: msg.to_timestamp,
         allocated_amount: msg.allocated_amount,
     };
-
     let state = State {
         unclaimed_tokens: Uint128::zero(),
     };
-
     let public_key = msg.public_key;
 
     PUBLIC_KEY.save(deps.storage, &public_key)?;
@@ -269,7 +265,7 @@ pub fn handle_transfer_unclaimed_tokens(
     }
 
     let max_transferrable_tokens =
-        query_balance(&deps.as_ref().querier, &config.asset, &env.contract.address)?;
+        query_balance(&deps.as_ref().querier, &env.contract.address, &config.asset)?;
 
     // CHECK :: Amount needs to be less than max_transferrable_tokens balance
     if amount > max_transferrable_tokens {
@@ -301,7 +297,7 @@ pub fn handle_transfer_unclaimed_tokens(
 }
 
 fn query_user_info(deps: Deps, user_address: String) -> StdResult<UserInfoResponse> {
-    let user_address = addr_validate_to_lower(deps.api, &user_address)?;
+    let user_address = deps.api.addr_validate(&user_address)?;
     let user_info = USERS
         .may_load(deps.storage, &user_address)?
         .unwrap_or_default();
@@ -310,12 +306,11 @@ fn query_user_info(deps: Deps, user_address: String) -> StdResult<UserInfoRespon
     })
 }
 
-fn query_user_claimed(deps: Deps, address: String) -> StdResult<ClaimResponse> {
-    let user_address = addr_validate_to_lower(deps.api, &address)?;
+fn query_user_claimed(deps: Deps, user_address: String) -> StdResult<ClaimResponse> {
+    let user_address = deps.api.addr_validate(&user_address)?;
     let user_info = USERS
         .may_load(deps.storage, &user_address)?
         .unwrap_or_default();
-
     Ok(ClaimResponse {
         is_claimed: !user_info.airdrop_amount.is_zero(),
     })
