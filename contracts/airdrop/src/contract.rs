@@ -1,16 +1,16 @@
-use crate::crypto::verify_claim;
+use crate::crypto::is_valid_signature;
 use crate::msg::{
     ClaimResponse, Cw20HookMsg, ExecuteMsg, InstantiateMsg, QueryMsg, Status, StatusResponse,
     UserInfoResponse,
 };
-use crate::state::{Config, State, CONFIG, PUBLIC_KEY, STATE, USERS};
+use crate::state::{Config, State, CONFIG, STATE, USERS};
 use cosmwasm_std::{
     attr, entry_point, from_binary, to_binary, Addr, Binary, Deps, DepsMut, Env, MessageInfo,
     Order, Response, StdError, StdResult, Uint128,
 };
 use cw2::set_contract_version;
 use cw20::Cw20ReceiveMsg;
-use genie::asset::{build_transfer_asset_msg, query_balance, AssetInfo};
+use genie::asset::{build_transfer_asset_msg, AssetInfo};
 
 const CONTRACT_NAME: &str = "genie";
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -25,25 +25,22 @@ pub fn instantiate(
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
     if msg.to_timestamp <= msg.from_timestamp {
         return Err(StdError::generic_err(
-            "Invalid airdrop claim window closure timestamp",
+            "to_timestamp must be greater than from_timestamp",
         ));
     }
 
-    let owner = deps.api.addr_validate(&msg.owner)?;
     let config = Config {
-        owner,
+        owner: deps.api.addr_validate(&msg.owner)?,
         asset: msg.asset,
         from_timestamp: msg.from_timestamp,
         to_timestamp: msg.to_timestamp,
         allocated_amount: msg.allocated_amount,
+        public_key: msg.public_key,
     };
-    let state = State {
-        unclaimed_tokens: Uint128::zero(),
-    };
-    let public_key = msg.public_key;
-
-    PUBLIC_KEY.save(deps.storage, &public_key)?;
     CONFIG.save(deps.storage, &config)?;
+    let state = State {
+        unclaimed_amount: Uint128::zero(),
+    };
     STATE.save(deps.storage, &state)?;
 
     Ok(Response::default())
@@ -73,12 +70,13 @@ pub fn execute(
 pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
         QueryMsg::Config {} => to_binary(&CONFIG.load(deps.storage)?),
-        QueryMsg::HasUserClaimed { address } => to_binary(&query_user_claimed(deps, address)?),
+        QueryMsg::State {} => to_binary(&STATE.load(deps.storage)?),
+        QueryMsg::HasUserClaimed { address } => to_binary(&query_has_user_claimed(deps, address)?),
         QueryMsg::UserInfo { address } => to_binary(&query_user_info(deps, address)?),
         QueryMsg::Status {} => to_binary(&query_status(deps, &env)?),
-        QueryMsg::State {} => to_binary(&STATE.load(deps.storage)?),
     }
 }
+
 pub fn receive_cw20(
     deps: DepsMut,
     env: Env,
@@ -89,23 +87,22 @@ pub fn receive_cw20(
 
     match config.asset {
         AssetInfo::NativeToken { denom: _ } => {
-            return Err(StdError::generic_err("Invalid asset type"));
+            return Err(StdError::generic_err("invalid asset type"));
         }
         AssetInfo::Token { contract_addr } => {
             if info.sender != contract_addr {
-                return Err(StdError::generic_err("Sender not authorized!"));
+                return Err(StdError::generic_err(
+                    "can only be called by token contract",
+                ));
             }
         }
     };
 
-    // CHECK :: CAN ONLY BE CALLED BY THE OWNER
     if cw20_msg.sender != config.owner {
-        return Err(StdError::generic_err("Only owner can call this function!"));
+        return Err(StdError::generic_err("can only be called by owner"));
     }
-
-    // CHECK ::: Amount needs to be valid
     if cw20_msg.amount.is_zero() {
-        return Err(StdError::generic_err("Amount must be greater than 0"));
+        return Err(StdError::generic_err("amount must be greater than 0"));
     }
 
     match from_binary(&cw20_msg.msg)? {
@@ -122,17 +119,16 @@ pub fn handle_increase_cw20_incentives(
 ) -> Result<Response, StdError> {
     if query_status(deps.as_ref(), &env)?.status != Status::NotStarted {
         return Err(StdError::generic_err(
-            "Token deposit not allowed after airdrop start time!",
+            "rewards can only be deposited before campaign starts/ends",
         ));
     }
     let mut state = STATE.load(deps.storage)?;
-
-    state.unclaimed_tokens += amount;
-
+    state.unclaimed_amount += amount;
     STATE.save(deps.storage, &state)?;
+
     Ok(Response::new()
-        .add_attribute("action", "airdrop incentives increased")
-        .add_attribute("current_airdrop_size", state.unclaimed_tokens))
+        .add_attribute("action", "genie_increase_rewards")
+        .add_attribute("current_reward_amount", state.unclaimed_amount))
 }
 
 pub fn handle_increase_native_incentives(
@@ -142,14 +138,13 @@ pub fn handle_increase_native_incentives(
 ) -> Result<Response, StdError> {
     if query_status(deps.as_ref(), &env)?.status != Status::NotStarted {
         return Err(StdError::generic_err(
-            "Token deposit not allowed after airdrop start time!",
+            "rewards can only be deposited before campaign starts/ends",
         ));
     }
-    let mut state = STATE.load(deps.storage)?;
-    let config = CONFIG.load(deps.storage)?;
 
+    let config = CONFIG.load(deps.storage)?;
     if info.sender != config.owner {
-        return Err(StdError::generic_err("Sender not authorized!"));
+        return Err(StdError::generic_err("can only be called by owner"));
     }
 
     let increase_amount: Uint128 = match config.asset {
@@ -160,20 +155,20 @@ pub fn handle_increase_native_incentives(
             .map(|coin| coin.amount)
             .sum(),
         AssetInfo::Token { contract_addr: _ } => {
-            return Err(StdError::generic_err("Invalid asset type"));
+            return Err(StdError::generic_err("invalid asset type"));
         }
     };
-
     if increase_amount.is_zero() {
-        return Err(StdError::generic_err("Amount must be greater than 0"));
+        return Err(StdError::generic_err("amount must be greater than 0"));
     }
 
-    state.unclaimed_tokens += increase_amount;
-
+    let mut state = STATE.load(deps.storage)?;
+    state.unclaimed_amount += increase_amount;
     STATE.save(deps.storage, &state)?;
+
     Ok(Response::new()
-        .add_attribute("action", "airdrop incentives increased")
-        .add_attribute("current_airdrop_size", state.unclaimed_tokens))
+        .add_attribute("action", "genie_increase_rewards")
+        .add_attribute("reward_size", state.unclaimed_amount))
 }
 
 pub fn handle_claim(
@@ -184,60 +179,53 @@ pub fn handle_claim(
     signature: Binary,
 ) -> Result<Response, StdError> {
     if query_status(deps.as_ref(), &env)?.status != Status::Ongoing {
-        return Err(StdError::generic_err("Airdrop not ongoing"));
+        return Err(StdError::generic_err("campaign is not ongoing"));
     }
 
-    let asset = &CONFIG.load(deps.storage)?.asset;
-
-    let receipient = &info.sender;
-    let public_key = PUBLIC_KEY.load(deps.storage)?;
-    if !verify_claim(
+    // Check if signature is valid
+    let recipient = &info.sender;
+    let is_valid = is_valid_signature(
         &deps,
-        &receipient,
+        &recipient,
         &env.contract.address.to_string(),
         claim_amount,
-        &signature.0,
-        &public_key.0,
-    )? {
-        return Err(StdError::generic_err("Signature verification failed"));
+        &signature,
+        &CONFIG.load(deps.storage)?.public_key,
+    )?;
+    if !is_valid {
+        return Err(StdError::generic_err("signature verification failed"));
     }
-    let mut user_info = USERS.load(deps.storage, receipient).unwrap_or_default();
-
-    // Check if addr has already claimed the tokens
-    if !user_info.airdrop_amount.is_zero() {
-        return Err(StdError::generic_err("Already claimed"));
+    // Check if recipient has already claimed the tokens
+    let mut user_info = USERS.load(deps.storage, recipient)?;
+    if !user_info.claimed_amount.is_zero() {
+        return Err(StdError::generic_err("address has already claimed once"));
     }
-    let unclaimed_tokens = STATE.load(deps.storage)?.unclaimed_tokens;
-    if unclaimed_tokens == Uint128::zero() {
-        return Err(StdError::generic_err(
-            "Airdrop tokens have been fully claimed",
-        ));
+    // Check if rewards have already been fully claimed
+    let mut state = STATE.load(deps.storage)?;
+    if state.unclaimed_amount == Uint128::zero() {
+        return Err(StdError::generic_err("rewards have been fully claimed"));
     }
 
-    // Allow for claims to claim remaining tokens if there are less tokens than the claim amount
-    let actual_amount: Uint128 = match unclaimed_tokens > claim_amount {
-        true => claim_amount,
-        false => unclaimed_tokens,
-    };
+    // Allow to claim remaining tokens if there are less tokens than the requested amount
+    let claim_amount: Uint128 = state.unclaimed_amount.min(claim_amount);
+    state.unclaimed_amount = state.unclaimed_amount.checked_sub(claim_amount)?;
+    STATE.save(deps.storage, &state)?;
+    user_info.claimed_amount = claim_amount;
+    USERS.save(deps.storage, recipient, &user_info)?;
 
-    user_info.airdrop_amount = actual_amount;
-    let updated_unclaimed_tokens = unclaimed_tokens.checked_sub(actual_amount)?;
-    STATE.update(deps.storage, |mut state| -> StdResult<_> {
-        state.unclaimed_tokens = updated_unclaimed_tokens;
-        Ok(state)
-    })?;
-    USERS.save(deps.storage, receipient, &user_info)?;
-
-    // TRANSFER tokens to the user
-    let mut messages = vec![];
-
-    messages.push(build_transfer_asset_msg(receipient, &asset, actual_amount)?);
+    // Transfer assets to the recipient
+    let config = &CONFIG.load(deps.storage)?;
+    let messages = vec![build_transfer_asset_msg(
+        recipient,
+        &config.asset,
+        claim_amount,
+    )?];
 
     Ok(Response::new().add_messages(messages).add_attributes(vec![
-        attr("action", "genie_claim"),
-        attr("receiver", receipient),
-        attr("asset", asset.asset_string()),
-        attr("amount", actual_amount),
+        attr("action", "genie_claim_rewards"),
+        attr("receiver", recipient),
+        attr("asset", config.asset.asset_string()),
+        attr("amount", claim_amount),
     ]))
 }
 
@@ -250,48 +238,35 @@ pub fn handle_transfer_unclaimed_tokens(
 ) -> Result<Response, StdError> {
     let config = CONFIG.load(deps.storage)?;
 
-    // CHECK :: CAN ONLY BE CALLED BY THE OWNER
+    // Can only be called by owner
     if info.sender != config.owner {
-        return Err(StdError::generic_err("Sender not authorized!"));
+        return Err(StdError::generic_err("can only be called by owner"));
+    }
+    // Can only withdraw if campaign is not ongoing
+    if query_status(deps.as_ref(), &env)?.status == Status::Ongoing {
+        return Err(StdError::generic_err(
+            "cannot withdraw while campaign is ongoing",
+        ));
     }
 
-    match query_status(deps.as_ref(), &env)?.status {
-        Status::Ongoing => {
-            return Err(StdError::generic_err(
-                "Tokens cannot be transferred out while airdrop is ongoing",
-            ));
-        }
-        _ => {}
-    }
-
-    let max_transferrable_tokens =
-        query_balance(&deps.as_ref().querier, &env.contract.address, &config.asset)?;
-
-    // CHECK :: Amount needs to be less than max_transferrable_tokens balance
-    if amount > max_transferrable_tokens {
-        return Err(StdError::generic_err(format!(
-            "Amount cannot exceed max available token balance {}",
-            max_transferrable_tokens
-        )));
-    }
-
-    // UPDATE STATE
+    // Allow transfers of remaining tokens if there are less tokens than the requested amount
     let mut state = STATE.load(deps.storage)?;
-    let updated_unclaimed_tokens = state
-        .unclaimed_tokens
+    let amount = state.unclaimed_amount.min(amount);
+    state.unclaimed_amount = state
+        .unclaimed_amount
         .checked_sub(amount)
         .unwrap_or(Uint128::zero());
-    state.unclaimed_tokens = updated_unclaimed_tokens;
     STATE.save(deps.storage, &state)?;
 
-    // COSMOS MSG :: TRANSFER TOKENS
+    // Transfer assets to recipient
     let transfer_msg = build_transfer_asset_msg(&recipient, &config.asset, amount)?;
 
     Ok(Response::new()
         .add_message(transfer_msg)
         .add_attributes(vec![
-            attr("action", "Airdrop::ExecuteMsg::TransferUnclaimedRewards"),
-            attr("recipient", recipient),
+            attr("action", "genie_transfer_unclaimed_rewards"),
+            attr("receiver", recipient),
+            attr("asset", config.asset.asset_string()),
             attr("amount", amount),
         ]))
 }
@@ -302,17 +277,17 @@ fn query_user_info(deps: Deps, user_address: String) -> StdResult<UserInfoRespon
         .may_load(deps.storage, &user_address)?
         .unwrap_or_default();
     Ok(UserInfoResponse {
-        airdrop_amount: user_info.airdrop_amount,
+        airdrop_amount: user_info.claimed_amount,
     })
 }
 
-fn query_user_claimed(deps: Deps, user_address: String) -> StdResult<ClaimResponse> {
+fn query_has_user_claimed(deps: Deps, user_address: String) -> StdResult<ClaimResponse> {
     let user_address = deps.api.addr_validate(&user_address)?;
     let user_info = USERS
         .may_load(deps.storage, &user_address)?
         .unwrap_or_default();
     Ok(ClaimResponse {
-        is_claimed: !user_info.airdrop_amount.is_zero(),
+        is_claimed: !user_info.claimed_amount.is_zero(),
     })
 }
 
@@ -321,11 +296,11 @@ fn query_status(deps: Deps, env: &Env) -> StdResult<StatusResponse> {
     let users_count = USERS
         .range(deps.storage, None, None, Order::Ascending)
         .count();
-    let token_amount = STATE.load(deps.storage)?.unclaimed_tokens;
+    let state = STATE.load(deps.storage)?;
 
     if config.from_timestamp < env.block.time.seconds()
         && users_count == usize::from(0u8)
-        && token_amount < config.allocated_amount
+        && state.unclaimed_amount < config.allocated_amount
     {
         Ok(StatusResponse {
             status: Status::Invalid,

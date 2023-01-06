@@ -13,13 +13,13 @@ pub struct InstantiateMsg {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum ExecuteMsg {
-    /// UpdateConfig update relevant code IDs
+    /// Update relevant code IDs
     UpdateConfig {
         owner: Option<String>,
         airdrop_code_id: Option<u64>,
         public_key: Option<Binary>,
     },
-    /// CreatePair instantiates pair contract
+    /// Create a new airdrop contract
     CreateAirdrop {
         asset_info: AssetInfo,
         from_timestamp: u64,

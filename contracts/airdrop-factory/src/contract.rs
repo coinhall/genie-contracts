@@ -1,15 +1,14 @@
+use crate::crypto::check_secp256k1_public_key;
+use crate::msg::{
+    AirdropInstantiateMsg, ConfigResponse, ExecuteMsg, InstantiateMsg, MigrateMsg, QueryMsg,
+};
+use crate::state::{Config, CONFIG};
 use cosmwasm_std::Uint128;
 use cosmwasm_std::{
     entry_point, to_binary, Binary, CosmosMsg, Deps, DepsMut, Env, MessageInfo, Response, StdError,
     StdResult, WasmMsg,
 };
 use cw2::set_contract_version;
-
-use crate::crypto::check_secp256k1_public_key;
-use crate::msg::{
-    AirdropInstantiateMsg, ConfigResponse, ExecuteMsg, InstantiateMsg, MigrateMsg, QueryMsg,
-};
-use crate::state::{Config, CONFIG};
 use genie::asset::AssetInfo;
 
 // version info for migration info
@@ -34,7 +33,6 @@ pub fn instantiate(
         airdrop_code_id: msg.airdrop_code_id,
         public_key: msg.public_key,
     };
-
     CONFIG.save(deps.storage, &config)?;
 
     Ok(Response::new())
@@ -65,7 +63,6 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> S
     }
 }
 
-// Only owner can execute it
 pub fn execute_update_config(
     deps: DepsMut,
     _env: Env,
@@ -76,20 +73,16 @@ pub fn execute_update_config(
 ) -> StdResult<Response> {
     let mut config: Config = CONFIG.load(deps.storage)?;
 
-    // permission check
     if info.sender != config.owner {
-        return Err(StdError::generic_err("unauthorized"));
+        return Err(StdError::generic_err("can only be called by owner"));
     }
-
     if let Some(owner) = owner {
         // validate address format
         config.owner = deps.api.addr_validate(&owner)?;
     }
-
     if let Some(airdrop_code_id) = airdrop_code_id {
         config.airdrop_code_id = airdrop_code_id;
     }
-
     if let Some(public_key) = public_key {
         if !check_secp256k1_public_key(&public_key) {
             return Err(StdError::generic_err("invalid public key"));
@@ -99,10 +92,9 @@ pub fn execute_update_config(
 
     CONFIG.save(deps.storage, &config)?;
 
-    Ok(Response::new().add_attribute("action", "update_config"))
+    Ok(Response::new().add_attribute("action", "genie_update_config"))
 }
 
-// Anyone can execute it to create swap pair
 pub fn execute_create_airdrop(
     deps: DepsMut,
     _env: Env,
@@ -115,15 +107,12 @@ pub fn execute_create_airdrop(
     let config: Config = CONFIG.load(deps.storage)?;
 
     Ok(Response::new()
-        .add_attributes(vec![
-            ("action", "create_airdrop"),
-            ("token", &asset_info.asset_string()),
-        ])
+        .add_attributes(vec![("action", "genie_create_campaign")])
         .add_message(CosmosMsg::Wasm(WasmMsg::Instantiate {
             code_id: config.airdrop_code_id,
             funds: vec![],
             admin: None,
-            label: "Genie Airdrop".to_string(),
+            label: String::from("Genie Campaign"),
             msg: to_binary(&AirdropInstantiateMsg {
                 owner: info.sender.to_string(),
                 asset: asset_info,
@@ -144,17 +133,16 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
 
 pub fn query_config(deps: Deps) -> StdResult<ConfigResponse> {
     let state: Config = CONFIG.load(deps.storage)?;
-    let resp = ConfigResponse {
+    let res = ConfigResponse {
         owner: state.owner.to_string(),
         airdrop_code_id: state.airdrop_code_id,
         public_key: state.public_key,
     };
-    Ok(resp)
+    Ok(res)
 }
 
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn migrate(deps: DepsMut, _env: Env, _msg: MigrateMsg) -> StdResult<Response> {
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
-
     Ok(Response::default())
 }
