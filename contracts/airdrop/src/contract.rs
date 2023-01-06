@@ -119,7 +119,7 @@ pub fn handle_increase_cw20_incentives(
 ) -> Result<Response, StdError> {
     if query_status(deps.as_ref(), &env)?.status != Status::NotStarted {
         return Err(StdError::generic_err(
-            "rewards can only be deposited before campaign starts/ends",
+            "rewards can only be deposited before campaign starts",
         ));
     }
     let mut state = STATE.load(deps.storage)?;
