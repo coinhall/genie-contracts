@@ -10,7 +10,7 @@ use cosmwasm_std::{
 };
 use cw2::set_contract_version;
 use cw20::Cw20ReceiveMsg;
-use genie::asset::{build_transfer_asset_msg, AssetInfo};
+use genie::asset::{build_transfer_asset_msg, query_balance, AssetInfo};
 
 const CONTRACT_NAME: &str = "genie";
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -250,8 +250,12 @@ pub fn handle_transfer_unclaimed_tokens(
     }
 
     // Allow transfers of remaining tokens if there are less tokens than the requested amount
+    // Balance in this contract must be queried to account for assets that was deposited
+    // without using the `increase_incentives` msg.
+    let max_transferable_amount =
+        query_balance(&deps.as_ref().querier, &env.contract.address, &config.asset)?;
+    let amount = max_transferable_amount.min(amount);
     let mut state = STATE.load(deps.storage)?;
-    let amount = state.unclaimed_amount.min(amount);
     state.unclaimed_amount = state
         .unclaimed_amount
         .checked_sub(amount)
