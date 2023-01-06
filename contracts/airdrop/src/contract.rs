@@ -196,7 +196,7 @@ pub fn handle_claim(
         return Err(StdError::generic_err("signature verification failed"));
     }
     // Check if recipient has already claimed the tokens
-    let mut user_info = USERS.load(deps.storage, recipient)?;
+    let mut user_info = USERS.load(deps.storage, recipient).unwrap_or_default();
     if !user_info.claimed_amount.is_zero() {
         return Err(StdError::generic_err("address has already claimed once"));
     }
