@@ -1,6 +1,9 @@
-
 [workspace]
-members = ["contracts/airdrop","contracts/airdrop-factory","packages/genie"]
+members = [
+  "packages/genie",
+  "contracts/genie-airdrop",
+  "contracts/genie-airdrop-factory",
+]
 
 [profile.release]
 opt-level = 3
@@ -12,4 +15,3 @@ codegen-units = 1
 panic = 'abort'
 incremental = false
 overflow-checks = true
-
