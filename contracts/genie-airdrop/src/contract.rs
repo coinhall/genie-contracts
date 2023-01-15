@@ -12,7 +12,7 @@ use cw2::set_contract_version;
 use cw20::Cw20ReceiveMsg;
 use genie::asset::{build_transfer_asset_msg, query_balance, AssetInfo};
 
-const CONTRACT_NAME: &str = "genie";
+const CONTRACT_NAME: &str = "genie-airdrop";
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 #[cfg_attr(not(feature = "library"), entry_point)]
@@ -250,8 +250,8 @@ pub fn handle_transfer_unclaimed_tokens(
     }
 
     // Allow transfers of remaining tokens if there are less tokens than the requested amount
-    // Balance in this contract must be queried to account for assets that was deposited
-    // without using the `increase_incentives` msg.
+    // Balance in this contract must be queried to handle the case where assets was deposited
+    // without using the `increase_incentives` execute msg.
     let max_transferable_amount =
         query_balance(&deps.as_ref().querier, &env.contract.address, &config.asset)?;
     let amount = max_transferable_amount.min(amount);
@@ -281,7 +281,7 @@ fn query_user_info(deps: Deps, user_address: String) -> StdResult<UserInfoRespon
         .may_load(deps.storage, &user_address)?
         .unwrap_or_default();
     Ok(UserInfoResponse {
-        airdrop_amount: user_info.claimed_amount,
+        claimed_amount: user_info.claimed_amount,
     })
 }
 
@@ -291,7 +291,7 @@ fn query_has_user_claimed(deps: Deps, user_address: String) -> StdResult<ClaimRe
         .may_load(deps.storage, &user_address)?
         .unwrap_or_default();
     Ok(ClaimResponse {
-        is_claimed: !user_info.claimed_amount.is_zero(),
+        has_claimed: !user_info.claimed_amount.is_zero(),
     })
 }
 

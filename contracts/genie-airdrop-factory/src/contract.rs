@@ -11,8 +11,7 @@ use cosmwasm_std::{
 use cw2::set_contract_version;
 use genie::asset::AssetInfo;
 
-// version info for migration info
-const CONTRACT_NAME: &str = "crates.io:genie-factory";
+const CONTRACT_NAME: &str = "genie-airdrop-factory";
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 #[cfg_attr(not(feature = "library"), entry_point)]

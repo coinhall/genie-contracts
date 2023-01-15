@@ -1,77 +1,42 @@
-# Genie Airdrop
+# `genie-contracts`
 
-(coming soon on [genie.coinhall.org](https://genie.coinhall.org))
-
-The Airdrop contract facilitates direct claiming of CW20 tokens airdropped to users who participate in genie campaigns
+**Powering [Genie campaigns](https://genie.coinhall.org).**
 
 ## Contracts
 
-| Name                                                 | Description                            |
-| ---------------------------------------------------- | -------------------------------------- |
-| [`genie-airdrop_factory`](contracts/airdrop-factory) | Factory contract for creating airdrops |
-| [`genie-airdrop`](contracts/airdrop)                 | Genie airdrop contract                 |
-
-- genie_airdrop_factory
-
-  Mainnet: `terraAbc12312312312312312312312312312312312312312312311231231231`
-
-  Testnet: `terrabbc12312312312312312312312312312312312312312312311231231231`
-
-  Mainnet (CodeID): xxx
-
-  Testnet (CodeID): xxxx
-
-- genie_airdrop
-
-  Mainnet (CodeID): xxx
-
-  Testnet (CodeID): xxxx
+- [`genie-airdrop-factory`](contracts/genie-airdrop-factory/README.md): factory contract for `genie-airdrop`
+  - Testnet code ID: TODO
+  - Testnet contract: `TODO`
+  - Mainnet code ID: TODO
+  - Mainnet contract: `TODO`
+- [`genie-airdrop`](contracts/genie-airdrop/README.md): contract which users claim rewards from
+  - Mainnet code ID: TODO
+  - Testnet code ID: TODO
 
 ## Scripts
 
-| Name                            | Description                                                             |
-| ------------------------------- | ----------------------------------------------------------------------- |
-| [`test`](scripts/src/test.ts)   | Test script to upload, instantiate and try out the contracts on testnet |
-| [`keygen`](scripts/src/test.ts) | Script to generate public and private secp256k1 keys                    |
+- [`test`](scripts/src/test.ts): to upload, instantiate and try out the contracts on testnet
+- [`keygen`](scripts/src/keygen.ts): to generate random public and private `secp256k1` keys
 
-# Running this contract
+## Installing
 
-## Prerequisites
+1. Install [Rust](https://www.rust-lang.org/tools/install) 1.44.1+
+2. Install [Docker](https://docs.docker.com/get-docker/) for compiling and ensuring that builds have similar checksums
+3. Install `wasm32-unknown-unknown` for rust
 
-- You will need [Rust](https://www.rust-lang.org/tools/install) 1.44.1+ with wasm32-unknown-unknown target installed.
-
-- [Docker](https://docs.docker.com/get-docker/) will be needed for compiling for the blockchain and ensuring the builds are the same for checksum comparison.
-
-- Install wasm32-unknown-unknown for rust
-
-```
+```sh
+# Check rust versions
 rustc --version
 cargo --version
 rustup target list --installed
-# if wasm32 is not listed above, run this
+# If `wasm32-unknown-unknown` is not listed, install it:
 rustup target add wasm32-unknown-unknown
 ```
 
-## Compiling for local testing
+## Building
 
-Run this in the contract file.
+Run in the root of this project to produce an optimised build in the `~/artifacts` directory:
 
+```sh
+./build.sh
 ```
-cargo wasm
-```
-
-## Compiling for the blockchain
-
-Or for a blockchain-ready (compressed) build, run the following from the repository root:
-
-```
-# Copy this or you can just run ./build.sh
-docker run --rm -v "$(pwd)":/code \
-  --mount type=volume,source="$(basename "$(pwd)")_cache",target=/code/target \
-  --mount type=volume,source=registry_cache,target=/usr/local/cargo/registry \
-  cosmwasm/workspace-optimizer:0.12.11
-```
-
-The optimized contracts and checksums are generated in the artifacts/ directory.
-
-The checksum can be compared against the one on https://terrasco.pe/mainnet/codes/123 (replace 123 with the Mainnet code id) or any other Terra blockchain explorer.

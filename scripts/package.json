@@ -4,7 +4,7 @@
   "license": "UNLICENSED",
   "private": true,
   "scripts": {
-    "start": "cross-env NODE_OPTIONS=\"--trace-warnings\" DOTENV_CONFIG_PATH=./config/.env ts-node -r dotenv/config --transpile-only"
+    "start": "cross-env NODE_OPTIONS=\"--trace-warnings\" DOTENV_CONFIG_PATH=./config/.env tsx -r dotenv/config"
   },
   "dependencies": {
     "@terra-money/feather.js": "^1.0.0-beta.3",
@@ -15,7 +15,7 @@
     "dotenv": "^16.0.0",
     "keccak256": "^1.0.6",
     "lodash": "^4.17.21",
-    "ts-node": "^10.7.0",
+    "tsx": "^3.12.2",
     "typescript": "^4.6.2"
   },
   "devDependencies": {
