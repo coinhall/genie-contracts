@@ -5,18 +5,10 @@
 ## Contracts
 
 - [`genie-airdrop-factory`](contracts/genie-airdrop-factory/README.md): factory contract for `genie-airdrop`
-  - Testnet code ID: TODO
-  - Testnet contract: `TODO`
-  - Mainnet code ID: TODO
-  - Mainnet contract: `TODO`
+  - Mainnet code ID: `970`
+  - Mainnet contract: `terra1dcfnzx0lh27w7rjh69e6kl5838dc7yyjj3r3h84jmkjjf08kknuqxr0x3r`
 - [`genie-airdrop`](contracts/genie-airdrop/README.md): contract which users claim rewards from
-  - Mainnet code ID: TODO
-  - Testnet code ID: TODO
-
-## Scripts
-
-- [`test`](scripts/src/test.ts): to upload, instantiate and try out the contracts on testnet
-- [`keygen`](scripts/src/keygen.ts): to generate random public and private `secp256k1` keys
+  - Mainnet code ID: `969`
 
 ## Installing
 

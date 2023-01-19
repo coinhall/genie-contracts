@@ -1,6 +1,6 @@
 use cosmwasm_std::{
-    to_binary, Addr, AllBalanceResponse, Api, BankMsg, BankQuery, Coin, CosmosMsg, QuerierWrapper,
-    QueryRequest, StdError, StdResult, Uint128, WasmMsg, WasmQuery,
+    to_binary, Addr, AllBalanceResponse, BankMsg, BankQuery, Coin, CosmosMsg, QuerierWrapper,
+    QueryRequest, StdResult, Uint128, WasmMsg, WasmQuery,
 };
 use cw20::{BalanceResponse, Cw20ExecuteMsg, Cw20QueryMsg};
 use schemars::JsonSchema;
