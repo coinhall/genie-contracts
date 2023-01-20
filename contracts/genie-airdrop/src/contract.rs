@@ -85,7 +85,7 @@ pub fn receive_cw20(
 ) -> Result<Response, StdError> {
     let config = CONFIG.load(deps.storage)?;
 
-    match config.asset {
+    match config.asset.clone() {
         AssetInfo::NativeToken { denom: _ } => {
             return Err(StdError::generic_err("invalid asset type"));
         }
@@ -107,7 +107,7 @@ pub fn receive_cw20(
 
     match from_binary(&cw20_msg.msg)? {
         Cw20HookMsg::IncreaseIncentives {} => {
-            handle_increase_cw20_incentives(deps, env, cw20_msg.amount)
+            handle_increase_cw20_incentives(deps, env, config.asset.asset_string(), cw20_msg.amount)
         }
     }
 }
@@ -115,6 +115,7 @@ pub fn receive_cw20(
 pub fn handle_increase_cw20_incentives(
     deps: DepsMut,
     env: Env,
+    asset: String,
     amount: Uint128,
 ) -> Result<Response, StdError> {
     if query_status(deps.as_ref(), &env)?.status != Status::NotStarted {
@@ -126,9 +127,11 @@ pub fn handle_increase_cw20_incentives(
     state.unclaimed_amount += amount;
     STATE.save(deps.storage, &state)?;
 
-    Ok(Response::new()
-        .add_attribute("action", "genie_increase_rewards")
-        .add_attribute("current_reward_amount", state.unclaimed_amount))
+    Ok(Response::new().add_attributes(vec![
+        attr("action", "genie_increase_rewards"),
+        attr("asset", asset),
+        attr("unclaimed_amount", state.unclaimed_amount),
+    ]))
 }
 
 pub fn handle_increase_native_incentives(
@@ -138,7 +141,7 @@ pub fn handle_increase_native_incentives(
 ) -> Result<Response, StdError> {
     if query_status(deps.as_ref(), &env)?.status != Status::NotStarted {
         return Err(StdError::generic_err(
-            "rewards can only be deposited before campaign starts/ends",
+            "rewards can only be deposited before campaign starts",
         ));
     }
 
@@ -147,7 +150,7 @@ pub fn handle_increase_native_incentives(
         return Err(StdError::generic_err("can only be called by owner"));
     }
 
-    let increase_amount: Uint128 = match config.asset {
+    let increase_amount: Uint128 = match config.asset.clone() {
         AssetInfo::NativeToken { denom } => info
             .funds
             .iter()
@@ -166,9 +169,11 @@ pub fn handle_increase_native_incentives(
     state.unclaimed_amount += increase_amount;
     STATE.save(deps.storage, &state)?;
 
-    Ok(Response::new()
-        .add_attribute("action", "genie_increase_rewards")
-        .add_attribute("reward_size", state.unclaimed_amount))
+    Ok(Response::new().add_attributes(vec![
+        attr("action", "genie_increase_rewards"),
+        attr("asset", config.asset.asset_string()),
+        attr("unclaimed_amount", state.unclaimed_amount),
+    ]))
 }
 
 pub fn handle_claim(
