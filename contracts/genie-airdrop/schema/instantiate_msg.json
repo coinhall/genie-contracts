@@ -40,9 +40,9 @@
       "type": "string"
     },
     "AssetInfo": {
+      "description": "A wrapper to represent both native coins and cw20 tokens as a single type",
       "oneOf": [
         {
-          "description": "Non-native Token",
           "type": "object",
           "required": [
             "token"
@@ -63,7 +63,6 @@
           "additionalProperties": false
         },
         {
-          "description": "Native token",
           "type": "object",
           "required": [
             "native_token"
