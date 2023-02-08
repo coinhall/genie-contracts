@@ -1,4 +1,4 @@
-use cosmwasm_std::{Addr, Binary, Uint128};
+use cosmwasm_std::{Binary, Uint128};
 use cw20::Cw20ReceiveMsg;
 use genie::asset::AssetInfo;
 use schemars::JsonSchema;
@@ -24,7 +24,7 @@ pub enum ExecuteMsg {
     },
     IncreaseIncentives {},
     TransferUnclaimedTokens {
-        recipient: Addr,
+        recipient: String,
         amount: Uint128,
     },
 }

@@ -5,8 +5,8 @@ use crate::msg::{
 };
 use crate::state::{Config, State, CONFIG, STATE, USERS};
 use cosmwasm_std::{
-    attr, entry_point, from_binary, to_binary, Addr, Binary, Deps, DepsMut, Env, MessageInfo,
-    Order, Response, StdError, StdResult, Uint128,
+    attr, entry_point, from_binary, to_binary, Binary, Deps, DepsMut, Env, MessageInfo, Order,
+    Response, StdError, StdResult, Uint128,
 };
 use cw2::set_contract_version;
 use cw20::Cw20ReceiveMsg;
@@ -238,9 +238,10 @@ pub fn handle_transfer_unclaimed_tokens(
     deps: DepsMut,
     env: Env,
     info: MessageInfo,
-    recipient: Addr,
+    recipient: String,
     amount: Uint128,
 ) -> Result<Response, StdError> {
+    let recipient = deps.api.addr_validate(&recipient)?;
     let config = CONFIG.load(deps.storage)?;
 
     // Can only be called by owner
