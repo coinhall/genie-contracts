@@ -3,11 +3,11 @@
   "title": "UserInfo",
   "type": "object",
   "required": [
-    "airdrop_amount"
+    "claimed_amount"
   ],
   "properties": {
-    "airdrop_amount": {
-      "description": "Total airdrop tokens claimed by the user",
+    "claimed_amount": {
+      "description": "Total assets claimed by this account",
       "allOf": [
         {
           "$ref": "#/definitions/Uint128"
