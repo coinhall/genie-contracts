@@ -25,6 +25,7 @@ pub enum ExecuteMsg {
         from_timestamp: u64,
         to_timestamp: u64,
         allocated_amount: Uint128,
+        campaign_id: String,
     },
 }
 
