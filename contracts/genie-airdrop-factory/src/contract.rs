@@ -3,7 +3,6 @@ use crate::msg::{
     AirdropInstantiateMsg, ConfigResponse, ExecuteMsg, InstantiateMsg, MigrateMsg, QueryMsg,
 };
 use crate::state::{Config, CONFIG};
-
 use cosmwasm_std::{
     entry_point, to_binary, Binary, CosmosMsg, Deps, DepsMut, Env, MessageInfo, Response, StdError,
     StdResult, WasmMsg, Uint128, attr,
