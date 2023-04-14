@@ -3,10 +3,10 @@ use crate::msg::{
     AirdropInstantiateMsg, ConfigResponse, ExecuteMsg, InstantiateMsg, MigrateMsg, QueryMsg,
 };
 use crate::state::{Config, CONFIG};
-use cosmwasm_std::Uint128;
+
 use cosmwasm_std::{
     entry_point, to_binary, Binary, CosmosMsg, Deps, DepsMut, Env, MessageInfo, Response, StdError,
-    StdResult, WasmMsg,
+    StdResult, WasmMsg, Uint128, attr,
 };
 use cw2::set_contract_version;
 use genie::asset::AssetInfo;
@@ -50,6 +50,7 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> S
             from_timestamp,
             to_timestamp,
             allocated_amount,
+            campaign_id
         } => execute_create_airdrop(
             deps,
             env,
@@ -58,6 +59,7 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> S
             from_timestamp,
             to_timestamp,
             allocated_amount,
+            campaign_id
         ),
     }
 }
@@ -102,11 +104,15 @@ pub fn execute_create_airdrop(
     from_timestamp: u64,
     to_timestamp: u64,
     allocated_amount: Uint128,
+    campaign_id: String,
 ) -> StdResult<Response> {
     let config: Config = CONFIG.load(deps.storage)?;
 
     Ok(Response::new()
-        .add_attributes(vec![("action", "genie_create_campaign")])
+        .add_attributes(vec![
+            attr("action", "genie_create_campaign"),
+            attr("campaign_id", campaign_id),
+        ])
         .add_message(CosmosMsg::Wasm(WasmMsg::Instantiate {
             code_id: config.airdrop_code_id,
             funds: vec![],
