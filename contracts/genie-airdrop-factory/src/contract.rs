@@ -4,8 +4,8 @@ use crate::msg::{
 };
 use crate::state::{Config, CONFIG};
 use cosmwasm_std::{
-    entry_point, to_binary, Binary, CosmosMsg, Deps, DepsMut, Env, MessageInfo, Response, StdError,
-    StdResult, WasmMsg, Uint128, attr,
+    attr, entry_point, to_binary, Binary, CosmosMsg, Deps, DepsMut, Env, MessageInfo, Response,
+    StdError, StdResult, Uint128, WasmMsg,
 };
 use cw2::set_contract_version;
 use genie::asset::AssetInfo;
@@ -49,7 +49,7 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> S
             from_timestamp,
             to_timestamp,
             allocated_amount,
-            campaign_id
+            campaign_id,
         } => execute_create_airdrop(
             deps,
             env,
@@ -58,7 +58,7 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> S
             from_timestamp,
             to_timestamp,
             allocated_amount,
-            campaign_id
+            campaign_id,
         ),
     }
 }

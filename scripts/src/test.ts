@@ -118,8 +118,8 @@ async function uploadContract(wallet: Wallet) {
   console.log("----------------------------------");
   const res = await terra.tx.broadcast(tx, "pisco-1");
   console.log(res);
-  const factoryCode = parseInt(res.logs[0].events[1].attributes[0].value);
-  const contractCode = parseInt(res.logs[1].events[1].attributes[0].value);
+  const factoryCode = parseInt(res.logs[0].events[1].attributes[1].value);
+  const contractCode = parseInt(res.logs[1].events[1].attributes[1].value);
   console.log("factoryCode", factoryCode);
   console.log("contractCode", contractCode);
   return [factoryCode, contractCode];
@@ -157,7 +157,8 @@ async function createAirdrop(
   asset: object,
   allocated_amount: number,
   from_timestamp: number,
-  to_timestamp: number
+  to_timestamp: number,
+  campaign_id: string
 ) {
   const createAirdrop = new MsgExecuteContract(
     wallet.key.accAddress("terra"),
@@ -168,6 +169,7 @@ async function createAirdrop(
         from_timestamp: from_timestamp,
         to_timestamp: to_timestamp,
         allocated_amount: allocated_amount.toString(),
+        campaign_id: campaign_id,
       },
     },
     {}
@@ -324,7 +326,7 @@ async function testall() {
     return instantiateFactory(hallwallet, res[0], res[1]);
   });
   // const factoryContract =
-  //   "terra13yd2sp8m9w92c35djuuy08856wflgum95cweq9zaxlwsvtyqc7hss68m26";
+  //   "terra1ujrqmcksvd75nxntqsv27j287wcy59mxlhjsydaylyz9u5flvm2qtp588j";
   await wait(6000);
 
   console.log("TESTING TEST 1");
@@ -358,7 +360,8 @@ async function test1(factoryContract: string) {
     asset_info,
     5000000,
     starttime,
-    endtime
+    endtime,
+    "1"
   );
   await wait(6000);
   await increaseIncentives(
@@ -367,41 +370,36 @@ async function test1(factoryContract: string) {
     2000000,
     airdropContract
   );
+  await wait(6000);
   await increaseIncentives(
     protocolWallet,
     TOKEN_CONTRACT,
     7000000,
     airdropContract
   );
-
   await wait(6000);
   await transferUnclaimedTokens(protocolWallet, airdropContract, 4000000);
   await waitUntil(starttime);
   await claim(userWallet, airdropContract, 2000000);
   await wait(6000); // Wait a bit for wallet nonce to update.
-  await claim(userWallet, airdropContract, 2000000)
-    .then((_) => {
-      throw new Error("Error not thrown");
-    })
-    .catch((err) => {
-      if (err.message !== "Error not thrown") {
-        console.log("error is thrown for double claim");
-      } else {
-        throw new Error("Error not thrown");
-      }
-    });
+  await claim(userWallet, airdropContract, 2000001);
+  await wait(6000);
   await claim(protocolWallet, airdropContract, 4000000);
+  await wait(6000);
   await claim(hallwallet, airdropContract, 1000000)
     .then((_) => {
       throw new Error("Error not thrown");
     })
     .catch((err) => {
       if (err.message !== "Error not thrown") {
-        console.log("error is thrown for double claim");
+        console.log(
+          "Error is thrown for being unable to claim due to no more tokens"
+        );
       } else {
         throw new Error("Error not thrown");
       }
     });
+  await wait(6000);
   return airdropContract;
 }
 
@@ -414,10 +412,12 @@ async function test2(factoryContract: string) {
     asset_info_luna,
     5000000,
     starttime,
-    endtime
+    endtime,
+    "2"
   );
-  wait(6000);
+  await wait(6000);
   await increaseLunaIncentives(protocolWallet, airdropContract, 2000000);
+  await wait(6000);
   await claim(userWallet, airdropContract, 2000000)
     .then((_) => {
       throw new Error("Error not thrown");
@@ -443,6 +443,7 @@ async function test2(factoryContract: string) {
         throw new Error("Error not thrown");
       }
     });
+  await waitUntil(endtime);
 
   transferUnclaimedTokens(protocolWallet, airdropContract, 2000000);
 }
@@ -456,7 +457,8 @@ async function test3(factoryContract: string) {
     asset_info,
     5000000,
     starttime,
-    endtime
+    endtime,
+    "3"
   );
   await wait(6000);
   await increaseIncentives(

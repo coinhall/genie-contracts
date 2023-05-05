@@ -200,11 +200,14 @@ pub fn handle_claim(
     if !is_valid {
         return Err(StdError::generic_err("signature verification failed"));
     }
-    // Check if recipient has already claimed the tokens
+
     let mut user_info = USERS.load(deps.storage, recipient).unwrap_or_default();
-    if !user_info.claimed_amount.is_zero() {
-        return Err(StdError::generic_err("address has already claimed once"));
+    if user_info.claimed_amount >= claim_amount {
+        return Err(StdError::generic_err(
+            "address has already claimed more than the requested amount",
+        ));
     }
+
     // Check if rewards have already been fully claimed
     let mut state = STATE.load(deps.storage)?;
     if state.unclaimed_amount == Uint128::zero() {
@@ -212,10 +215,16 @@ pub fn handle_claim(
     }
 
     // Allow to claim remaining tokens if there are less tokens than the requested amount
-    let claim_amount: Uint128 = state.unclaimed_amount.min(claim_amount);
+    // Allow to claim the difference if user already claimed some tokens
+    let claim_amount: Uint128 = state
+        .unclaimed_amount
+        .min(claim_amount.checked_sub(user_info.claimed_amount)?);
+
     state.unclaimed_amount = state.unclaimed_amount.checked_sub(claim_amount)?;
     STATE.save(deps.storage, &state)?;
-    user_info.claimed_amount = claim_amount;
+
+    // Store old claim amount(usually 0) + new claim amount
+    user_info.claimed_amount = user_info.claimed_amount.checked_add(claim_amount)?;
     USERS.save(deps.storage, recipient, &user_info)?;
 
     // Transfer assets to the recipient
@@ -230,7 +239,7 @@ pub fn handle_claim(
         attr("action", "genie_claim_rewards"),
         attr("receiver", recipient),
         attr("asset", config.asset.asset_string()),
-        attr("amount", claim_amount),
+        attr("amount", user_info.claimed_amount),
     ]))
 }
 
