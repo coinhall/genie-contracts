@@ -240,6 +240,7 @@ pub fn handle_claim(
         attr("receiver", recipient),
         attr("asset", config.asset.asset_string()),
         attr("amount", user_info.claimed_amount),
+        attr("receive_amount", claim_amount),
     ]))
 }
 
