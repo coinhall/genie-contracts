@@ -324,46 +324,6 @@ async function waitUntil(s: number) {
   });
 }
 
-testall();
-
-async function testall() {
-  // console.log("UPLOADING CONTRACTS");
-  // const factoryContract = await uploadContract(hallwallet).then(async (res) => {
-  //   await wait(6000);
-  //   console.log("INSTANTIATING FACTORY");
-  //   return instantiateFactory(hallwallet, res[0], res[1]);
-  // });
-  const factoryContract =
-    "terra1ydwlh3auwwhn7xl4fn5zaeqx7xktmd9kqp0la4da3zxd7t6frjws2j50st";
-  await wait(6000);
-
-  // console.log("TESTING MULTI TEST 1");
-  // await test1(factoryContract).catch((err) => {
-  //   console.log(err);
-  // });
-  // await wait(6000);
-
-  // console.log("TESTING SINGLE TEST 1");
-  // await single_test1(factoryContract).catch((err) => {
-  //   console.log(err);
-  // });
-  // await wait(6000);
-
-  // console.log("TESTING SINGLE TEST 2");
-  // await single_test2(factoryContract).catch((err) => {
-  //   console.log(err);
-  // });
-  // await wait(6000);
-
-  console.log("TESTING SINGLE TEST 3");
-  await single_test3(factoryContract).catch((err) => {
-    console.log(err);
-  });
-  await wait(6000);
-
-  console.log("DONE TESTING");
-}
-
 const expectError = (message) => (err: Error) => {
   if (err.message !== "Error not thrown") {
     console.log(message);
@@ -375,7 +335,49 @@ const throwErr = (_: any) => {
   throw new Error("Error not thrown");
 };
 
+testall();
+
+async function testall() {
+  console.log("UPLOADING CONTRACTS");
+  const factoryContract = await uploadContract(hallwallet).then(async (res) => {
+    await wait(6000);
+    console.log("INSTANTIATING FACTORY");
+    return instantiateFactory(hallwallet, res[0], res[1]);
+  });
+  await wait(6000);
+
+  // const factoryContract =
+  //   "terra1ydwlh3auwwhn7xl4fn5zaeqx7xktmd9kqp0la4da3zxd7t6frjws2j50st";
+
+  console.log("TESTING MULTI TEST 1");
+  await test1(factoryContract).catch((err) => {
+    console.log(err);
+  });
+  await wait(6000);
+
+  console.log("TESTING SINGLE TEST 1");
+  await single_test1(factoryContract).catch((err) => {
+    console.log(err);
+  });
+  await wait(6000);
+
+  console.log("TESTING SINGLE TEST 2");
+  await single_test2(factoryContract).catch((err) => {
+    console.log(err);
+  });
+  await wait(6000);
+
+  console.log("TESTING SINGLE TEST 3");
+  await single_test3(factoryContract).catch((err) => {
+    console.log(err);
+  });
+  await wait(6000);
+
+  console.log("DONE TESTING");
+}
+
 /*
+Test scenario for multi mission contract
 - [ ]  User1 claims [2,0,0] astro
 - [ ]  User1 claims [3,0,0] astro (Receives 1 astro)
 - [ ]  User1 claims [1,0,0] astro (fail)
