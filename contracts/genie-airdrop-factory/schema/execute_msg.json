@@ -51,17 +51,24 @@
         "create_airdrop": {
           "type": "object",
           "required": [
-            "allocated_amount",
+            "allocated_amounts",
             "asset_info",
+            "campaign_id",
             "from_timestamp",
             "to_timestamp"
           ],
           "properties": {
-            "allocated_amount": {
-              "$ref": "#/definitions/Uint128"
+            "allocated_amounts": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/Uint128"
+              }
             },
             "asset_info": {
               "$ref": "#/definitions/AssetInfo"
+            },
+            "campaign_id": {
+              "type": "string"
             },
             "from_timestamp": {
               "type": "integer",

@@ -23,11 +23,11 @@
         "claim": {
           "type": "object",
           "required": [
-            "claim_amount",
+            "claim_amounts",
             "signature"
           ],
           "properties": {
-            "claim_amount": {
+            "claim_amounts": {
               "type": "array",
               "items": {
                 "$ref": "#/definitions/Uint128"
