@@ -234,10 +234,6 @@ pub fn handle_claim(
                     "claim amount cannot be greater than the claimed amount",
                 ));
             }
-
-            // get the difference between claim_amount and claimed_amount
-            // make it also the minimum of the state.unclaimed_amount and the difference
-            // get a vector of the minimums
             let difference = amount.checked_sub(user_info.claimed_amounts[i])?;
             let min = state.unclaimed_amounts[i].min(difference);
             state.unclaimed_amounts[i] = state.unclaimed_amounts[i].checked_sub(min)?;
@@ -254,6 +250,7 @@ pub fn handle_claim(
     }
 
     // Store old claim amount(usually 0) + new claim amount
+
     USERS.save(deps.storage, recipient, &user_info)?;
     // save the new state
     STATE.save(deps.storage, &state)?;

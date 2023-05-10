@@ -512,6 +512,7 @@ async function single_test2(factoryContract: string) {
   await claim(userWallet, airdropContract, [2000000])
     .then(throwErr)
     .catch(expectError("Error is thrown for being unable to claim due to no more tokens")); // prettier-ignore
+
   await waitUntil(endtime);
 
   transferUnclaimedTokens(protocolWallet, airdropContract, 2000000);
