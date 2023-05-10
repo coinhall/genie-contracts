@@ -155,7 +155,7 @@ async function createAirdrop(
   wallet: Wallet,
   factoryContract: string,
   asset: object,
-  allocated_amount: number,
+  allocated_amounts: number[],
   from_timestamp: number,
   to_timestamp: number,
   campaign_id: string
@@ -168,7 +168,7 @@ async function createAirdrop(
         asset_info: asset,
         from_timestamp: from_timestamp,
         to_timestamp: to_timestamp,
-        allocated_amount: allocated_amount.toString(),
+        allocated_amounts: allocated_amounts.map((x) => x.toString()),
         campaign_id: campaign_id,
       },
     },
@@ -241,11 +241,18 @@ async function increaseLunaIncentives(
   const res = await terra.tx.broadcast(tx, "pisco-1");
   console.log(res);
 }
-async function claim(wallet: Wallet, airdropContract: string, amount: number) {
+async function claim(
+  wallet: Wallet,
+  airdropContract: string,
+  amount: number[]
+) {
   const private_key = Buffer.from(PRIVATEKEY ?? "", "base64");
   const account = wallet.key.accAddress("terra");
   const claimsContract = airdropContract;
-  const claimstr = account + "," + amount + "," + claimsContract;
+  const amountstr = amount
+    .map((x) => x.toLocaleString("fullwide", { useGrouping: false }))
+    .join(",");
+  const claimstr = account + "," + amountstr + "," + claimsContract;
   const msg = keccak256(Buffer.from(claimstr));
   const sigObj = secp256k1.ecdsaSign(msg, private_key);
   const signature = Buffer.from(sigObj.signature).toString("base64");
@@ -255,7 +262,7 @@ async function claim(wallet: Wallet, airdropContract: string, amount: number) {
     {
       claim: {
         signature: signature,
-        claim_amount: amount.toString(),
+        claim_amounts: amount.map((x) => x.toString()),
       },
     },
     {}
@@ -318,37 +325,125 @@ async function waitUntil(s: number) {
 }
 
 testall();
+
 async function testall() {
-  console.log("UPLOADING CONTRACTS");
-  const factoryContract = await uploadContract(hallwallet).then(async (res) => {
-    await wait(6000);
-    console.log("INSTANTIATING FACTORY");
-    return instantiateFactory(hallwallet, res[0], res[1]);
-  });
-  // const factoryContract =
-  //   "terra1ujrqmcksvd75nxntqsv27j287wcy59mxlhjsydaylyz9u5flvm2qtp588j";
+  // console.log("UPLOADING CONTRACTS");
+  // const factoryContract = await uploadContract(hallwallet).then(async (res) => {
+  //   await wait(6000);
+  //   console.log("INSTANTIATING FACTORY");
+  //   return instantiateFactory(hallwallet, res[0], res[1]);
+  // });
+  const factoryContract =
+    "terra1ydwlh3auwwhn7xl4fn5zaeqx7xktmd9kqp0la4da3zxd7t6frjws2j50st";
   await wait(6000);
 
-  console.log("TESTING TEST 1");
-  await test1(factoryContract).catch((err) => {
+  // console.log("TESTING MULTI TEST 1");
+  // await test1(factoryContract).catch((err) => {
+  //   console.log(err);
+  // });
+  // await wait(6000);
+
+  // console.log("TESTING SINGLE TEST 1");
+  // await single_test1(factoryContract).catch((err) => {
+  //   console.log(err);
+  // });
+  // await wait(6000);
+
+  // console.log("TESTING SINGLE TEST 2");
+  // await single_test2(factoryContract).catch((err) => {
+  //   console.log(err);
+  // });
+  // await wait(6000);
+
+  console.log("TESTING SINGLE TEST 3");
+  await single_test3(factoryContract).catch((err) => {
     console.log(err);
   });
   await wait(6000);
 
-  console.log("TESTING TEST 2");
-  await test2(factoryContract).catch((err) => {
-    console.log(err);
-  });
-  await wait(20000);
-
-  console.log("TESTING TEST 3");
-  await test3(factoryContract).catch((err) => {
-    console.log(err);
-  });
   console.log("DONE TESTING");
 }
 
+const expectError = (message) => (err: Error) => {
+  if (err.message !== "Error not thrown") {
+    console.log(message);
+  } else {
+    throw new Error("Error not thrown");
+  }
+};
+const throwErr = (_: any) => {
+  throw new Error("Error not thrown");
+};
+
+/*
+- [ ]  User1 claims [2,0,0] astro
+- [ ]  User1 claims [3,0,0] astro (Receives 1 astro)
+- [ ]  User1 claims [1,0,0] astro (fail)
+- [ ]  User1 claims [1,0,3] astro (fail)
+- [ ]  User1 claims [3,0,0] astro (fail)
+- [ ]  User2 claims [5,5,5] astro
+- [ ]  User3 claims [10,1,1] astro (Receives 2 + 1 + 1 astro)
+- [ ]  User1 claims [4,0,0] astro (fail, nothing left to claim)
+- [ ]  User1 claims [4,0,1] astro (Receives 1 astro from mission 3)
+50 - 10 - 6 - 7 = 27
+*/
 async function test1(factoryContract: string) {
+  const starttime = Math.trunc(Date.now() / 1000 + 60);
+  const endtime = Math.trunc(Date.now() / 1000 + 300);
+  await wait(6000);
+
+  const airdropContract = await createAirdrop(
+    protocolWallet,
+    factoryContract,
+    asset_info,
+    [10_000_000, 20_000_000, 20_000_000],
+    starttime,
+    endtime,
+    "1"
+  );
+  await wait(6000);
+  await increaseIncentives(
+    protocolWallet,
+    TOKEN_CONTRACT,
+    50_000_000,
+    airdropContract
+  );
+  await waitUntil(starttime);
+  await claim(userWallet, airdropContract, [2_000_000, 0, 0]);
+  await wait(6000); // Wait a bit for wallet nonce to update.
+  await claim(userWallet, airdropContract, [3_000_000, 0, 0]);
+  await wait(6000);
+  await claim(userWallet, airdropContract, [1_000_000, 0, 0])
+    .then(throwErr)
+    .catch(expectError("Error is thrown for being unable to claim"));
+  await wait(6000);
+  await claim(userWallet, airdropContract, [1_000_000, 0, 3_000_000])
+    .then(throwErr)
+    .catch(expectError("Error is thrown for being unable to claim"));
+  await wait(6000);
+  await claim(userWallet, airdropContract, [3_000_000, 0, 0])
+    .then(throwErr)
+    .catch(expectError("Error is thrown for being unable to claim"));
+  await wait(6000);
+  await claim(
+    protocolWallet,
+    airdropContract,
+    [5_000_000, 5_000_000, 5_000_000]
+  );
+  await wait(6000);
+  await claim(hallwallet, airdropContract, [10_000_000, 1_000_000, 1_000_000]);
+  await wait(6000);
+  await claim(userWallet, airdropContract, [4_000_000, 0, 0])
+    .then(throwErr)
+    .catch(expectError("Error is thrown for being unable to claim"));
+  await wait(6000);
+  await claim(userWallet, airdropContract, [4_000_000, 0, 1_000_000]);
+  await waitUntil(endtime);
+  await transferUnclaimedTokens(protocolWallet, airdropContract, 27_000_000);
+  return airdropContract;
+}
+
+async function single_test1(factoryContract: string) {
   const starttime = Math.trunc(Date.now() / 1000 + 60);
   const endtime = Math.trunc(Date.now() / 1000 + 500);
 
@@ -358,7 +453,7 @@ async function test1(factoryContract: string) {
     protocolWallet,
     factoryContract,
     asset_info,
-    5000000,
+    [5000000],
     starttime,
     endtime,
     "1"
@@ -380,37 +475,27 @@ async function test1(factoryContract: string) {
   await wait(6000);
   await transferUnclaimedTokens(protocolWallet, airdropContract, 4000000);
   await waitUntil(starttime);
-  await claim(userWallet, airdropContract, 2000000);
+  await claim(userWallet, airdropContract, [2000000]);
   await wait(6000); // Wait a bit for wallet nonce to update.
-  await claim(userWallet, airdropContract, 2000001);
+  await claim(userWallet, airdropContract, [2000001]);
   await wait(6000);
-  await claim(protocolWallet, airdropContract, 4000000);
+  await claim(protocolWallet, airdropContract, [4000000]);
   await wait(6000);
-  await claim(hallwallet, airdropContract, 1000000)
-    .then((_) => {
-      throw new Error("Error not thrown");
-    })
-    .catch((err) => {
-      if (err.message !== "Error not thrown") {
-        console.log(
-          "Error is thrown for being unable to claim due to no more tokens"
-        );
-      } else {
-        throw new Error("Error not thrown");
-      }
-    });
+  await claim(hallwallet, airdropContract, [1000000])
+    .then(throwErr)
+    .catch(expectError("Error is thrown for being unable to claim"));
   await wait(6000);
   return airdropContract;
 }
 
-async function test2(factoryContract: string) {
+async function single_test2(factoryContract: string) {
   const starttime = Math.trunc(Date.now() / 1000 + 60);
-  const endtime = Math.trunc(Date.now() / 1000 + 600);
+  const endtime = Math.trunc(Date.now() / 1000 + 250);
   const airdropContract = await createAirdrop(
     protocolWallet,
     factoryContract,
     asset_info_luna,
-    5000000,
+    [5000000],
     starttime,
     endtime,
     "2"
@@ -418,44 +503,26 @@ async function test2(factoryContract: string) {
   await wait(6000);
   await increaseLunaIncentives(protocolWallet, airdropContract, 2000000);
   await wait(6000);
-  await claim(userWallet, airdropContract, 2000000)
-    .then((_) => {
-      throw new Error("Error not thrown");
-    })
-    .catch((err) => {
-      if (err.message !== "Error not thrown") {
-        console.log("Error is thrown for claim before start");
-      } else {
-        throw new Error("Error not thrown");
-      }
-    });
+  await claim(userWallet, airdropContract, [2000000])
+    .then(throwErr)
+    .catch(expectError("Error is thrown for claim before start"));
   await waitUntil(starttime);
-  await claim(userWallet, airdropContract, 2000000)
-    .then((_) => {
-      throw new Error("Error not thrown");
-    })
-    .catch((err) => {
-      if (err.message !== "Error not thrown") {
-        console.log(
-          "Error is thrown for being unable to claim due to no more tokens"
-        );
-      } else {
-        throw new Error("Error not thrown");
-      }
-    });
+  await claim(userWallet, airdropContract, [2000000])
+    .then(throwErr)
+    .catch(expectError("Error is thrown for being unable to claim due to no more tokens")); // prettier-ignore
   await waitUntil(endtime);
 
   transferUnclaimedTokens(protocolWallet, airdropContract, 2000000);
 }
 
-async function test3(factoryContract: string) {
+async function single_test3(factoryContract: string) {
   const starttime = Math.trunc(Date.now() / 1000 + 50);
-  const endtime = Math.trunc(Date.now() / 1000 + 200);
+  const endtime = Math.trunc(Date.now() / 1000 + 150);
   const airdropContract = await createAirdrop(
     protocolWallet,
     factoryContract,
     asset_info,
-    5000000,
+    [5000000],
     starttime,
     endtime,
     "3"
@@ -468,7 +535,7 @@ async function test3(factoryContract: string) {
     airdropContract
   );
   await waitUntil(starttime);
-  await claim(userWallet, airdropContract, 2000000);
+  await claim(userWallet, airdropContract, [2000000]);
   await waitUntil(endtime);
   await transferUnclaimedTokens(protocolWallet, airdropContract, 4000000);
 }

@@ -6,6 +6,7 @@
     "allocated_amount",
     "asset",
     "from_timestamp",
+    "mission_count",
     "owner",
     "public_key",
     "to_timestamp"
@@ -29,6 +30,12 @@
     },
     "from_timestamp": {
       "description": "Timestamp for the start of this campaign",
+      "type": "integer",
+      "format": "uint64",
+      "minimum": 0.0
+    },
+    "mission_count": {
+      "description": "The number of missions in this campaign",
       "type": "integer",
       "format": "uint64",
       "minimum": 0.0

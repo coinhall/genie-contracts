@@ -48,7 +48,7 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> S
             asset_info,
             from_timestamp,
             to_timestamp,
-            allocated_amount,
+            allocated_amounts,
             campaign_id,
         } => execute_create_airdrop(
             deps,
@@ -57,7 +57,7 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> S
             asset_info,
             from_timestamp,
             to_timestamp,
-            allocated_amount,
+            allocated_amounts,
             campaign_id,
         ),
     }
@@ -102,7 +102,7 @@ pub fn execute_create_airdrop(
     asset_info: AssetInfo,
     from_timestamp: u64,
     to_timestamp: u64,
-    allocated_amount: Uint128,
+    allocated_amounts: Vec<Uint128>,
     campaign_id: String,
 ) -> StdResult<Response> {
     let config: Config = CONFIG.load(deps.storage)?;
@@ -123,7 +123,7 @@ pub fn execute_create_airdrop(
                 from_timestamp,
                 to_timestamp,
                 public_key: config.public_key.clone(),
-                allocated_amount,
+                allocated_amounts,
             })?,
         })))
 }

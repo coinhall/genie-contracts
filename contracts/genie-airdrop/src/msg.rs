@@ -11,7 +11,7 @@ pub struct InstantiateMsg {
     pub public_key: Binary,
     pub from_timestamp: u64,
     pub to_timestamp: u64,
-    pub allocated_amount: Uint128,
+    pub allocated_amounts: Vec<Uint128>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
@@ -19,7 +19,7 @@ pub struct InstantiateMsg {
 pub enum ExecuteMsg {
     Receive(Cw20ReceiveMsg),
     Claim {
-        claim_amount: Uint128,
+        claim_amounts: Vec<Uint128>,
         signature: Binary,
     },
     IncreaseIncentives {},
@@ -47,7 +47,7 @@ pub enum QueryMsg {
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct UserInfoResponse {
-    pub claimed_amount: Uint128,
+    pub claimed_amount: Vec<Uint128>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]

@@ -28,7 +28,10 @@
           ],
           "properties": {
             "claim_amount": {
-              "$ref": "#/definitions/Uint128"
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/Uint128"
+              }
             },
             "signature": {
               "$ref": "#/definitions/Binary"

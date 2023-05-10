@@ -3,21 +3,30 @@
   "title": "InstantiateMsg",
   "type": "object",
   "required": [
-    "allocated_amount",
+    "allocated_amounts",
     "asset",
     "from_timestamp",
+    "mission_count",
     "owner",
     "public_key",
     "to_timestamp"
   ],
   "properties": {
-    "allocated_amount": {
-      "$ref": "#/definitions/Uint128"
+    "allocated_amounts": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/Uint128"
+      }
     },
     "asset": {
       "$ref": "#/definitions/AssetInfo"
     },
     "from_timestamp": {
+      "type": "integer",
+      "format": "uint64",
+      "minimum": 0.0
+    },
+    "mission_count": {
       "type": "integer",
       "format": "uint64",
       "minimum": 0.0
