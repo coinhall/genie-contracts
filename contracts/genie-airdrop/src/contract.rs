@@ -36,11 +36,6 @@ pub fn instantiate(
     if msg.allocated_amounts.is_empty() {
         return Err(StdError::generic_err("allocated_amounts must not be empty"));
     }
-    if msg.allocated_amounts.contains(&(Uint128::zero())) {
-        return Err(StdError::generic_err(
-            "allocated_amounts must not contain zero",
-        ));
-    }
 
     let config = Config {
         owner: deps.api.addr_validate(&msg.owner)?,
@@ -227,29 +222,23 @@ pub fn handle_claim(
 
     let mut claimable_amounts: Vec<Uint128> = vec![];
     // iterate through claimed_amounts and claim_amount to verify that claim_amount is greater than claimed_amount
-    if !user_info.claimed_amounts.is_empty() {
-        for (i, amount) in claim_amounts.iter().enumerate() {
-            if amount < &user_info.claimed_amounts[i] {
-                return Err(StdError::generic_err(
-                    "claim amount cannot be greater than the claimed amount",
-                ));
-            }
-            let difference = amount.checked_sub(user_info.claimed_amounts[i])?;
-            let min = state.unclaimed_amounts[i].min(difference);
-            state.unclaimed_amounts[i] = state.unclaimed_amounts[i].checked_sub(min)?;
-            user_info.claimed_amounts[i] = user_info.claimed_amounts[i].checked_add(min)?;
-            claimable_amounts.push(min);
-        }
-    } else {
-        for (i, amount) in claim_amounts.iter().enumerate() {
-            let min = state.unclaimed_amounts[i].min(*amount);
-            state.unclaimed_amounts[i] = state.unclaimed_amounts[i].checked_sub(min)?;
-            user_info.claimed_amounts.push(min);
-            claimable_amounts.push(min);
-        }
+    if user_info.claimed_amounts.is_empty() {
+        user_info.claimed_amounts = vec![Uint128::zero(); claim_amounts.len()];
     }
 
-    // Store old claim amount(usually 0) + new claim amount
+    for (i, amount) in claim_amounts.iter().enumerate() {
+        if amount < &user_info.claimed_amounts[i] {
+            return Err(StdError::generic_err(
+                "claim amount cannot be greater than the claimed amount",
+            ));
+        }
+        let difference = amount.checked_sub(user_info.claimed_amounts[i])?;
+        let actual_claim_amount = state.unclaimed_amounts[i].min(difference);
+        state.unclaimed_amounts[i] = state.unclaimed_amounts[i].checked_sub(actual_claim_amount)?;
+        user_info.claimed_amounts[i] =
+            user_info.claimed_amounts[i].checked_add(actual_claim_amount)?;
+        claimable_amounts.push(actual_claim_amount);
+    }
 
     USERS.save(deps.storage, recipient, &user_info)?;
     // save the new state
@@ -355,10 +344,8 @@ fn query_status(deps: Deps, env: &Env) -> StdResult<StatusResponse> {
     let users_count = USERS
         .range(deps.storage, None, None, Order::Ascending)
         .count();
-    // let state = STATE.load(deps.storage)?;
-
-    // query for current amount of assets in the contract
-    let current_amount = query_balance(&deps.querier, &env.contract.address, &config.asset)?;
+    let state = STATE.load(deps.storage)?;
+    let current_amount = state.unclaimed_amount;
 
     if config.from_timestamp < env.block.time.seconds()
         && users_count == usize::from(0u8)
