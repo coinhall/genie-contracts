@@ -9,6 +9,8 @@ use serde::{Deserialize, Serialize};
 pub struct Config {
     /// Account with 'owner' credentials
     pub owner: Addr,
+    /// Account with 'coinhall' credentials
+    pub coinhall: Addr,
     /// Campaign reward asset
     pub asset: AssetInfo,
     /// Timestamp for the start of this campaign
@@ -29,6 +31,10 @@ pub struct State {
     pub unclaimed_amounts: Vec<Uint128>,
     /// Unclaimed amount for indexing and querying
     pub unclaimed_amount: Uint128,
+    /// Premature end of campaign, coinhall and owner can end the campaign early if they do it together
+    pub premature_end: bool,
+    pub premature_end_timestamp: u64,
+    pub premature_end_coinhall: bool,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema, Default)]

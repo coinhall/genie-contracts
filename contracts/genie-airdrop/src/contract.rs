@@ -39,6 +39,7 @@ pub fn instantiate(
 
     let config = Config {
         owner: deps.api.addr_validate(&msg.owner)?,
+        coinhall: deps.api.addr_validate(&msg.coinhall)?,
         asset: msg.asset,
         from_timestamp: msg.from_timestamp,
         to_timestamp: msg.to_timestamp,
@@ -50,6 +51,9 @@ pub fn instantiate(
     let state = State {
         unclaimed_amounts: msg.allocated_amounts,
         unclaimed_amount: Uint128::zero(),
+        premature_end: false,
+        premature_end_coinhall: false,
+        premature_end_timestamp: msg.to_timestamp,
     };
     STATE.save(deps.storage, &state)?;
 
@@ -72,6 +76,10 @@ pub fn execute(
         } => handle_claim(deps, env, info, claim_amounts, signature),
         ExecuteMsg::TransferUnclaimedTokens { recipient, amount } => {
             handle_transfer_unclaimed_tokens(deps, env, info, recipient, amount)
+        }
+        ExecuteMsg::PrematureEndCampaign {} => set_premature_end(deps, env, info),
+        ExecuteMsg::PrematureCoinhallEndCampaign { end_timestamp } => {
+            set_coinhall_premature_end(deps, env, info, end_timestamp)
         }
     }
 }
@@ -319,6 +327,47 @@ pub fn handle_transfer_unclaimed_tokens(
         ]))
 }
 
+fn set_premature_end(deps: DepsMut, _env: Env, info: MessageInfo) -> Result<Response, StdError> {
+    let config = CONFIG.load(deps.storage)?;
+    if info.sender != config.owner {
+        return Err(StdError::generic_err("can only be called by owner"));
+    }
+    let mut state = STATE.load(deps.storage)?;
+    if state.premature_end {
+        return Err(StdError::generic_err("premature end already set"));
+    }
+    state.premature_end = true;
+    STATE.save(deps.storage, &state)?;
+    Ok(Response::new().add_attributes(vec![
+        attr("action", "set_premature_end"),
+        attr("owner", info.sender),
+    ]))
+}
+
+fn set_coinhall_premature_end(
+    deps: DepsMut,
+    _env: Env,
+    info: MessageInfo,
+    end_timestamp: u64,
+) -> Result<Response, StdError> {
+    let config = CONFIG.load(deps.storage)?;
+    if info.sender != config.owner {
+        return Err(StdError::generic_err("can only be called by owner"));
+    }
+    let mut state = STATE.load(deps.storage)?;
+    if state.premature_end_coinhall {
+        return Err(StdError::generic_err("premature end already set"));
+    }
+    state.premature_end_coinhall = true;
+    state.premature_end_timestamp = end_timestamp;
+    STATE.save(deps.storage, &state)?;
+    Ok(Response::new().add_attributes(vec![
+        attr("action", "set_premature_end_coinhall"),
+        attr("end_timestamp", end_timestamp.to_string()),
+        attr("coinhall", info.sender),
+    ]))
+}
+
 fn query_user_info(deps: Deps, user_address: String) -> StdResult<UserInfoResponse> {
     let user_address = deps.api.addr_validate(&user_address)?;
     let user_info = USERS
@@ -346,6 +395,9 @@ fn query_status(deps: Deps, env: &Env) -> StdResult<StatusResponse> {
         .count();
     let state = STATE.load(deps.storage)?;
     let current_amount = state.unclaimed_amount;
+    let premature_end = state.premature_end
+        && state.premature_end_coinhall
+        && state.premature_end_timestamp < env.block.time.seconds();
 
     if env.block.time.seconds() >= config.from_timestamp
         && users_count == usize::from(0u8)
@@ -360,6 +412,7 @@ fn query_status(deps: Deps, env: &Env) -> StdResult<StatusResponse> {
         })
     } else if env.block.time.seconds() >= config.from_timestamp
         && env.block.time.seconds() < config.to_timestamp
+        && !premature_end
     {
         Ok(StatusResponse {
             status: Status::Ongoing,

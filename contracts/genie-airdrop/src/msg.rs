@@ -7,6 +7,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct InstantiateMsg {
     pub owner: String,
+    pub coinhall: String,
     pub asset: AssetInfo,
     pub public_key: Binary,
     pub from_timestamp: u64,
@@ -26,6 +27,10 @@ pub enum ExecuteMsg {
     TransferUnclaimedTokens {
         recipient: String,
         amount: Uint128,
+    },
+    PrematureEndCampaign {},
+    PrematureCoinhallEndCampaign {
+        end_timestamp: u64,
     },
 }
 
