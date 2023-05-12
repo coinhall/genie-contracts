@@ -28,13 +28,13 @@ pub fn instantiate(
             "to_timestamp must be greater than from_timestamp",
         ));
     }
+    if msg.allocated_amounts.is_empty() {
+        return Err(StdError::generic_err("allocated_amounts must not be empty"));
+    }
     if msg.allocated_amounts.iter().any(|&x| x == Uint128::zero()) {
         return Err(StdError::generic_err(
             "allocated_amounts must not contain zero",
         ));
-    }
-    if msg.allocated_amounts.is_empty() {
-        return Err(StdError::generic_err("allocated_amounts must not be empty"));
     }
 
     let config = Config {
@@ -347,7 +347,7 @@ fn query_status(deps: Deps, env: &Env) -> StdResult<StatusResponse> {
     let state = STATE.load(deps.storage)?;
     let current_amount = state.unclaimed_amount;
 
-    if config.from_timestamp < env.block.time.seconds()
+    if env.block.time.seconds() >= config.from_timestamp
         && users_count == usize::from(0u8)
         && current_amount < config.allocated_amount
     {
@@ -358,7 +358,7 @@ fn query_status(deps: Deps, env: &Env) -> StdResult<StatusResponse> {
         Ok(StatusResponse {
             status: Status::NotStarted,
         })
-    } else if env.block.time.seconds() > config.from_timestamp
+    } else if env.block.time.seconds() >= config.from_timestamp
         && env.block.time.seconds() < config.to_timestamp
     {
         Ok(StatusResponse {
