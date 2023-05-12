@@ -3,16 +3,15 @@
   "title": "UserInfo",
   "type": "object",
   "required": [
-    "claimed_amount"
+    "claimed_amounts"
   ],
   "properties": {
-    "claimed_amount": {
-      "description": "Total assets claimed by this account",
-      "allOf": [
-        {
-          "$ref": "#/definitions/Uint128"
-        }
-      ]
+    "claimed_amounts": {
+      "description": "Assets claimed, per mission, by this account",
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/Uint128"
+      }
     }
   },
   "definitions": {

@@ -24,7 +24,7 @@ pub enum ExecuteMsg {
         asset_info: AssetInfo,
         from_timestamp: u64,
         to_timestamp: u64,
-        allocated_amount: Uint128,
+        allocated_amounts: Vec<Uint128>,
         campaign_id: String,
     },
 }
@@ -52,5 +52,5 @@ pub struct AirdropInstantiateMsg {
     pub public_key: Binary,
     pub from_timestamp: u64,
     pub to_timestamp: u64,
-    pub allocated_amount: Uint128,
+    pub allocated_amounts: Vec<Uint128>,
 }

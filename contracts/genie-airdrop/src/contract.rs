@@ -28,17 +28,27 @@ pub fn instantiate(
             "to_timestamp must be greater than from_timestamp",
         ));
     }
+    if msg.allocated_amounts.is_empty() {
+        return Err(StdError::generic_err("allocated_amounts must not be empty"));
+    }
+    if msg.allocated_amounts.iter().any(|&x| x == Uint128::zero()) {
+        return Err(StdError::generic_err(
+            "allocated_amounts must not contain zero",
+        ));
+    }
 
     let config = Config {
         owner: deps.api.addr_validate(&msg.owner)?,
         asset: msg.asset,
         from_timestamp: msg.from_timestamp,
         to_timestamp: msg.to_timestamp,
-        allocated_amount: msg.allocated_amount,
+        allocated_amount: msg.allocated_amounts.iter().sum(),
         public_key: msg.public_key,
+        mission_count: msg.allocated_amounts.len() as u64,
     };
     CONFIG.save(deps.storage, &config)?;
     let state = State {
+        unclaimed_amounts: msg.allocated_amounts,
         unclaimed_amount: Uint128::zero(),
     };
     STATE.save(deps.storage, &state)?;
@@ -57,9 +67,9 @@ pub fn execute(
         ExecuteMsg::Receive(msg) => receive_cw20(deps, env, info, msg),
         ExecuteMsg::IncreaseIncentives {} => handle_increase_native_incentives(deps, env, info),
         ExecuteMsg::Claim {
-            claim_amount,
+            claim_amounts,
             signature,
-        } => handle_claim(deps, env, info, claim_amount, signature),
+        } => handle_claim(deps, env, info, claim_amounts, signature),
         ExecuteMsg::TransferUnclaimedTokens { recipient, amount } => {
             handle_transfer_unclaimed_tokens(deps, env, info, recipient, amount)
         }
@@ -180,20 +190,29 @@ pub fn handle_claim(
     deps: DepsMut,
     env: Env,
     info: MessageInfo,
-    claim_amount: Uint128,
+    claim_amounts: Vec<Uint128>,
     signature: Binary,
 ) -> Result<Response, StdError> {
     if query_status(deps.as_ref(), &env)?.status != Status::Ongoing {
         return Err(StdError::generic_err("campaign is not ongoing"));
     }
 
-    // Check if signature is valid
     let recipient = &info.sender;
+    let mut user_info = USERS.load(deps.storage, recipient).unwrap_or_default();
+    let mut state = STATE.load(deps.storage)?;
+
+    if claim_amounts.len() != state.unclaimed_amounts.len() {
+        return Err(StdError::generic_err(
+            "claim amount length does not match claimable amount length",
+        ));
+    }
+
+    // Check if signature is valid
     let is_valid = is_valid_signature(
         &deps,
         &recipient,
         &env.contract.address.to_string(),
-        claim_amount,
+        claim_amounts.clone(),
         &signature,
         &CONFIG.load(deps.storage)?.public_key,
     )?;
@@ -201,31 +220,32 @@ pub fn handle_claim(
         return Err(StdError::generic_err("signature verification failed"));
     }
 
-    let mut user_info = USERS.load(deps.storage, recipient).unwrap_or_default();
-    if user_info.claimed_amount >= claim_amount {
-        return Err(StdError::generic_err(
-            "address has already claimed more than the requested amount",
-        ));
+    let mut claimable_amounts: Vec<Uint128> = vec![];
+    // iterate through claimed_amounts and claim_amount to verify that claim_amount is greater than claimed_amount
+    if user_info.claimed_amounts.is_empty() {
+        user_info.claimed_amounts = vec![Uint128::zero(); claim_amounts.len()];
     }
 
-    // Check if rewards have already been fully claimed
-    let mut state = STATE.load(deps.storage)?;
-    if state.unclaimed_amount == Uint128::zero() {
-        return Err(StdError::generic_err("rewards have been fully claimed"));
+    for (i, amount) in claim_amounts.iter().enumerate() {
+        if amount < &user_info.claimed_amounts[i] {
+            return Err(StdError::generic_err(
+                "claim amount cannot be smaller than the claimed amount",
+            ));
+        }
+        let difference = amount.checked_sub(user_info.claimed_amounts[i])?;
+        let actual_claim_amount = state.unclaimed_amounts[i].min(difference);
+        state.unclaimed_amounts[i] = state.unclaimed_amounts[i].checked_sub(actual_claim_amount)?;
+        user_info.claimed_amounts[i] =
+            user_info.claimed_amounts[i].checked_add(actual_claim_amount)?;
+        claimable_amounts.push(actual_claim_amount);
     }
 
-    // Allow to claim remaining tokens if there are less tokens than the requested amount
-    // Allow to claim the difference if user already claimed some tokens
-    let claim_amount: Uint128 = state
-        .unclaimed_amount
-        .min(claim_amount.checked_sub(user_info.claimed_amount)?);
-
-    state.unclaimed_amount = state.unclaimed_amount.checked_sub(claim_amount)?;
+    USERS.save(deps.storage, recipient, &user_info)?;
+    // save the new state
     STATE.save(deps.storage, &state)?;
 
-    // Store old claim amount(usually 0) + new claim amount
-    user_info.claimed_amount = user_info.claimed_amount.checked_add(claim_amount)?;
-    USERS.save(deps.storage, recipient, &user_info)?;
+    // Get sum of claimable amounts
+    let claim_amount: Uint128 = claimable_amounts.iter().sum();
 
     // Transfer assets to the recipient
     let config = &CONFIG.load(deps.storage)?;
@@ -239,7 +259,15 @@ pub fn handle_claim(
         attr("action", "genie_claim_rewards"),
         attr("receiver", recipient),
         attr("asset", config.asset.asset_string()),
-        attr("amount", user_info.claimed_amount),
+        attr(
+            "amount",
+            user_info
+                .claimed_amounts
+                .iter()
+                .map(|x| x.to_string())
+                .collect::<Vec<String>>()
+                .join(","),
+        ),
         attr("receive_amount", claim_amount),
     ]))
 }
@@ -297,7 +325,7 @@ fn query_user_info(deps: Deps, user_address: String) -> StdResult<UserInfoRespon
         .may_load(deps.storage, &user_address)?
         .unwrap_or_default();
     Ok(UserInfoResponse {
-        claimed_amount: user_info.claimed_amount,
+        claimed_amount: user_info.claimed_amounts,
     })
 }
 
@@ -307,7 +335,7 @@ fn query_has_user_claimed(deps: Deps, user_address: String) -> StdResult<ClaimRe
         .may_load(deps.storage, &user_address)?
         .unwrap_or_default();
     Ok(ClaimResponse {
-        has_claimed: !user_info.claimed_amount.is_zero(),
+        has_claimed: !user_info.claimed_amounts.is_empty(),
     })
 }
 
@@ -317,10 +345,11 @@ fn query_status(deps: Deps, env: &Env) -> StdResult<StatusResponse> {
         .range(deps.storage, None, None, Order::Ascending)
         .count();
     let state = STATE.load(deps.storage)?;
+    let current_amount = state.unclaimed_amount;
 
-    if config.from_timestamp < env.block.time.seconds()
+    if env.block.time.seconds() >= config.from_timestamp
         && users_count == usize::from(0u8)
-        && state.unclaimed_amount < config.allocated_amount
+        && current_amount < config.allocated_amount
     {
         Ok(StatusResponse {
             status: Status::Invalid,
@@ -329,7 +358,7 @@ fn query_status(deps: Deps, env: &Env) -> StdResult<StatusResponse> {
         Ok(StatusResponse {
             status: Status::NotStarted,
         })
-    } else if env.block.time.seconds() > config.from_timestamp
+    } else if env.block.time.seconds() >= config.from_timestamp
         && env.block.time.seconds() < config.to_timestamp
     {
         Ok(StatusResponse {

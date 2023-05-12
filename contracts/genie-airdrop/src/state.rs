@@ -19,18 +19,22 @@ pub struct Config {
     pub allocated_amount: Uint128,
     /// The public key used to verify claims
     pub public_key: Binary,
+    /// The number of missions in this campaign
+    pub mission_count: u64,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct State {
-    /// Total unclaimed amount currently in this contract
+    /// Unclaimed amount, per mission, currently in this contract
+    pub unclaimed_amounts: Vec<Uint128>,
+    /// Unclaimed amount for indexing and querying
     pub unclaimed_amount: Uint128,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema, Default)]
 pub struct UserInfo {
-    /// Total assets claimed by this account
-    pub claimed_amount: Uint128,
+    /// Assets claimed, per mission, by this account
+    pub claimed_amounts: Vec<Uint128>,
 }
 
 pub const CONFIG: Item<Config> = Item::new("config");
