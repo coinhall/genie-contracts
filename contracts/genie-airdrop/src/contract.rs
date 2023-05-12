@@ -229,7 +229,7 @@ pub fn handle_claim(
     for (i, amount) in claim_amounts.iter().enumerate() {
         if amount < &user_info.claimed_amounts[i] {
             return Err(StdError::generic_err(
-                "claim amount cannot be greater than the claimed amount",
+                "claim amount cannot be smaller than the claimed amount",
             ));
         }
         let difference = amount.checked_sub(user_info.claimed_amounts[i])?;
