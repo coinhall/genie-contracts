@@ -346,7 +346,7 @@ fn set_premature_end(deps: DepsMut, _env: Env, info: MessageInfo) -> Result<Resp
 
 fn set_coinhall_premature_end(
     deps: DepsMut,
-    _env: Env,
+    env: Env,
     info: MessageInfo,
     end_timestamp: u64,
 ) -> Result<Response, StdError> {
@@ -357,6 +357,11 @@ fn set_coinhall_premature_end(
     let mut state = STATE.load(deps.storage)?;
     if state.premature_end_coinhall {
         return Err(StdError::generic_err("premature end already set"));
+    }
+    if end_timestamp <= env.block.time.seconds() + 1 {
+        return Err(StdError::generic_err(
+            "end timestamp must be at least 1 second in the future",
+        ));
     }
     state.premature_end_coinhall = true;
     state.premature_end_timestamp = end_timestamp;
