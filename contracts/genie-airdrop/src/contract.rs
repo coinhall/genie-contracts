@@ -268,7 +268,14 @@ pub fn handle_claim(
                 .collect::<Vec<String>>()
                 .join(","),
         ),
-        attr("receive_amount", claim_amount),
+        attr(
+            "receive_amount",
+            claimable_amounts
+                .iter()
+                .map(|x| x.to_string())
+                .collect::<Vec<String>>()
+                .join(","),
+        ),
     ]))
 }
 
