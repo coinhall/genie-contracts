@@ -27,8 +27,8 @@ pub struct Config {
 pub struct State {
     /// Unclaimed amount, per mission, currently in this contract
     pub unclaimed_amounts: Vec<Uint128>,
-    /// Unclaimed amount for indexing and querying
-    pub unclaimed_amount: Uint128,
+    /// Total funds protocol has sent and removed to this contract via `increase_incentives` and `transfer_unclaimed_tokens`
+    pub protocol_funding: Uint128,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema, Default)]

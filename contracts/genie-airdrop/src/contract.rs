@@ -49,7 +49,7 @@ pub fn instantiate(
     CONFIG.save(deps.storage, &config)?;
     let state = State {
         unclaimed_amounts: msg.allocated_amounts,
-        unclaimed_amount: Uint128::zero(),
+        protocol_funding: Uint128::zero(),
     };
     STATE.save(deps.storage, &state)?;
 
@@ -134,13 +134,13 @@ pub fn handle_increase_cw20_incentives(
         ));
     }
     let mut state = STATE.load(deps.storage)?;
-    state.unclaimed_amount += amount;
+    state.protocol_funding += amount;
     STATE.save(deps.storage, &state)?;
 
     Ok(Response::new().add_attributes(vec![
         attr("action", "genie_increase_rewards"),
         attr("asset", asset),
-        attr("unclaimed_amount", state.unclaimed_amount),
+        attr("protocol_funding", state.protocol_funding),
     ]))
 }
 
@@ -176,13 +176,13 @@ pub fn handle_increase_native_incentives(
     }
 
     let mut state = STATE.load(deps.storage)?;
-    state.unclaimed_amount += increase_amount;
+    state.protocol_funding += increase_amount;
     STATE.save(deps.storage, &state)?;
 
     Ok(Response::new().add_attributes(vec![
         attr("action", "genie_increase_rewards"),
         attr("asset", config.asset.asset_string()),
-        attr("unclaimed_amount", state.unclaimed_amount),
+        attr("protocol_funding", state.protocol_funding),
     ]))
 }
 
@@ -307,8 +307,8 @@ pub fn handle_transfer_unclaimed_tokens(
         query_balance(&deps.as_ref().querier, &env.contract.address, &config.asset)?;
     let amount = max_transferable_amount.min(amount);
     let mut state = STATE.load(deps.storage)?;
-    state.unclaimed_amount = state
-        .unclaimed_amount
+    state.protocol_funding = state
+        .protocol_funding
         .checked_sub(amount)
         .unwrap_or(Uint128::zero());
     STATE.save(deps.storage, &state)?;
@@ -352,7 +352,7 @@ fn query_status(deps: Deps, env: &Env) -> StdResult<StatusResponse> {
         .range(deps.storage, None, None, Order::Ascending)
         .count();
     let state = STATE.load(deps.storage)?;
-    let current_amount = state.unclaimed_amount;
+    let current_amount = state.protocol_funding;
 
     if env.block.time.seconds() >= config.from_timestamp
         && users_count == usize::from(0u8)
