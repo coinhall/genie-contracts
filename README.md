@@ -5,10 +5,10 @@
 ## Contracts
 
 - [`genie-airdrop-factory`](contracts/genie-airdrop-factory/README.md): factory contract for `genie-airdrop`
-  - Mainnet code ID: `970`
+  - Mainnet code ID: `1683`
   - Mainnet contract: `terra1dcfnzx0lh27w7rjh69e6kl5838dc7yyjj3r3h84jmkjjf08kknuqxr0x3r`
 - [`genie-airdrop`](contracts/genie-airdrop/README.md): contract which users claim rewards from
-  - Mainnet code ID: `1091`
+  - Mainnet code ID: `1682`
 
 ## Installing
 
