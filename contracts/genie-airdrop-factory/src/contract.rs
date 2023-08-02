@@ -2,7 +2,8 @@ use crate::crypto::check_secp256k1_public_key;
 use crate::state::{Config, CAMPAIGN_ADDRESSES, CONFIG};
 use cosmwasm_std::{
     attr, entry_point, to_binary, Addr, Binary, CosmosMsg, Deps, DepsMut, Empty, Env, MessageInfo,
-    Order, Reply, ReplyOn, Response, StdError, StdResult, SubMsg, Uint128, WasmMsg,
+    Order, Reply, ReplyOn, Response, StdError, StdResult, SubMsg, SubMsgResponse, SubMsgResult,
+    Uint128, WasmMsg,
 };
 use cw2::set_contract_version;
 use cw_utils::{parse_instantiate_response_data, MsgInstantiateContractResponse};
@@ -179,16 +180,10 @@ pub fn query_campaign_statuses(
         } else {
             CAMPAIGN_ADDRESSES
                 .range(deps.storage, None, None, Order::Ascending)
-                .map(|c| Ok(c.unwrap().0))
+                .map(|c| Ok(c?.0))
                 .collect::<StdResult<Vec<_>>>()
         }
-    };
-
-    if campaign_addrs_to_search.is_err() {
-        return Err(campaign_addrs_to_search.unwrap_err());
-    }
-
-    let campaign_addrs_to_search = campaign_addrs_to_search.unwrap();
+    }?;
 
     let statuses: StdResult<Vec<CampaignStatus>> = campaign_addrs_to_search
         .iter()
@@ -196,7 +191,7 @@ pub fn query_campaign_statuses(
             let res = deps
                 .querier
                 .query_wasm_smart(addr, &AirDropQueryMsg::Status {})
-                .unwrap_or_else(|_| StatusResponse {
+                .unwrap_or(StatusResponse {
                     status: AirDropStatus::Invalid,
                 });
 
@@ -274,15 +269,25 @@ pub fn migrate(deps: DepsMut, _env: Env, _msg: MigrateMsg) -> StdResult<Response
 
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn reply(deps: DepsMut, _env: Env, msg: Reply) -> StdResult<Response> {
-    let data = msg.result.unwrap().data.unwrap();
-    let res: MsgInstantiateContractResponse = parse_instantiate_response_data(&data)
-        .map_err(|_| StdError::generic_err("Error parsing instantiate reply"))?;
+    match msg {
+        Reply {
+            id: _,
+            result:
+                SubMsgResult::Ok(SubMsgResponse {
+                    data: Some(data), ..
+                }),
+        } => {
+            let res: MsgInstantiateContractResponse = parse_instantiate_response_data(&data)
+                .map_err(|_| StdError::generic_err("Error parsing instantiate reply"))?;
 
-    CAMPAIGN_ADDRESSES.save(
-        deps.storage,
-        &Addr::unchecked(res.contract_address),
-        &Empty {},
-    )?;
+            CAMPAIGN_ADDRESSES.save(
+                deps.storage,
+                &Addr::unchecked(res.contract_address),
+                &Empty {},
+            )?;
 
-    Ok(Response::default())
+            Ok(Response::default())
+        }
+        _ => Err(StdError::generic_err("Failed to parse reply")),
+    }
 }
