@@ -2,8 +2,8 @@ use crate::crypto::check_secp256k1_public_key;
 use crate::state::{Config, CAMPAIGN_ADDRESSES, CONFIG};
 use cosmwasm_std::{
     attr, entry_point, to_binary, Addr, Binary, CosmosMsg, Deps, DepsMut, Empty, Env, MessageInfo,
-    Order, Reply, ReplyOn, Response, StdError, StdResult, SubMsg, SubMsgResponse, SubMsgResult,
-    Uint128, WasmMsg,
+    Reply, ReplyOn, Response, StdError, StdResult, SubMsg, SubMsgResponse, SubMsgResult, Uint128,
+    WasmMsg,
 };
 use cw2::set_contract_version;
 use cw_utils::{parse_instantiate_response_data, MsgInstantiateContractResponse};
@@ -161,29 +161,19 @@ pub fn query_config(deps: Deps) -> StdResult<ConfigResponse> {
 
 pub fn query_campaign_statuses(
     deps: Deps,
-    addresses: Option<Vec<String>>,
+    addresses: Vec<String>,
 ) -> StdResult<Vec<CampaignStatus>> {
-    let campaign_addrs_to_search = {
-        if let Some(addresses) = addresses {
-            addresses
-                .iter()
-                .map(|address| {
-                    let is_valid = deps.api.addr_validate(&address);
-                    if is_valid.is_err()
-                        || !CAMPAIGN_ADDRESSES.has(deps.storage, &Addr::unchecked(address))
-                    {
-                        return Err(StdError::generic_err("Invalid address provided"));
-                    }
-                    Ok(Addr::unchecked(address))
-                })
-                .collect::<StdResult<Vec<_>>>()
-        } else {
-            CAMPAIGN_ADDRESSES
-                .range(deps.storage, None, None, Order::Ascending)
-                .map(|c| Ok(c?.0))
-                .collect::<StdResult<Vec<_>>>()
-        }
-    }?;
+    let campaign_addrs_to_search = addresses
+        .iter()
+        .map(|address| {
+            let is_valid = deps.api.addr_validate(&address);
+            if is_valid.is_err() || !CAMPAIGN_ADDRESSES.has(deps.storage, &Addr::unchecked(address))
+            {
+                return Err(StdError::generic_err("Invalid address provided"));
+            }
+            Ok(Addr::unchecked(address))
+        })
+        .collect::<StdResult<Vec<_>>>()?;
 
     let statuses: StdResult<Vec<CampaignStatus>> = campaign_addrs_to_search
         .iter()

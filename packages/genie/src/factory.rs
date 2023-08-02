@@ -1,5 +1,5 @@
+use crate::{airdrop::Status, asset::AssetInfo};
 use cosmwasm_std::{Binary, Uint128};
-use crate::{asset::AssetInfo, airdrop::Status};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
@@ -33,7 +33,7 @@ pub enum ExecuteMsg {
 #[serde(rename_all = "snake_case")]
 pub enum QueryMsg {
     Config {},
-    CampaignStatuses { addresses: Option<Vec<String>> },
+    CampaignStatuses { addresses: Vec<String> },
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
