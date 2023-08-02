@@ -1,5 +1,5 @@
 use cosmwasm_std::{Binary, Uint128};
-use genie::asset::AssetInfo;
+use crate::{asset::AssetInfo, airdrop::Status};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
@@ -33,6 +33,7 @@ pub enum ExecuteMsg {
 #[serde(rename_all = "snake_case")]
 pub enum QueryMsg {
     Config {},
+    CampaignStatuses { addresses: Option<Vec<String>> },
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
@@ -40,6 +41,17 @@ pub struct ConfigResponse {
     pub owner: String,
     pub airdrop_code_id: u64,
     pub public_key: Binary,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+pub struct CampaignStatus {
+    pub address: String,
+    pub status: Status,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+pub struct CampaignStatusesResponse {
+    pub statuses: Vec<CampaignStatus>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]

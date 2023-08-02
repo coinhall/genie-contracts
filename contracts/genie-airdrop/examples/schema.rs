@@ -3,7 +3,7 @@ use std::fs::create_dir_all;
 
 use cosmwasm_schema::{export_schema, remove_schemas, schema_for};
 
-use genie_airdrop::msg::{Cw20HookMsg, ExecuteMsg, InstantiateMsg, QueryMsg};
+use genie::airdrop::{Cw20HookMsg, ExecuteMsg, InstantiateMsg, QueryMsg};
 use genie_airdrop::state::{Config, UserInfo};
 
 fn main() {
