@@ -45,7 +45,6 @@ uint = "0.9.3"
 cw20 = "0.13.4"
 cosmwasm-storage = "1.0.0"
 genie = { path = "../../packages/genie", default-features = false, version = "0.1.0" }
-genie-airdrop = { path = "../genie-airdrop", default-features = false, version = "0.1.0" }
 
 [dev-dependencies]
 cosmwasm-schema = { version = "1.0.0" }
