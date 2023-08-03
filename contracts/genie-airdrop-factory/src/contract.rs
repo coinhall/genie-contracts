@@ -5,7 +5,7 @@ use cosmwasm_std::{
     StdError, StdResult, Uint128, WasmMsg,
 };
 use cw2::set_contract_version;
-use genie::airdrop::{QueryMsg as AirDropQueryMsg, StatusResponse};
+use genie::airdrop::{QueryMsg as AirdropQueryMsg, StatusResponse};
 use genie::asset::AssetInfo;
 use genie::factory::{
     AirdropInstantiateMsg, CampaignStatus, ConfigResponse, ExecuteMsg, InstantiateMsg, MigrateMsg,
@@ -159,12 +159,12 @@ pub fn query_campaign_statuses(
         .map(|addr| {
             let res: StatusResponse = deps
                 .querier
-                .query_wasm_smart(addr, &AirDropQueryMsg::Status {})?;
+                .query_wasm_smart(addr, &AirdropQueryMsg::Status {})?;
 
-            return Ok(CampaignStatus {
+            Ok(CampaignStatus {
                 address: addr.into(),
                 status: res.status,
-            });
+            })
         })
         .collect()
 }
