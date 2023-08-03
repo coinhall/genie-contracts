@@ -1,14 +1,16 @@
 use crate::crypto::check_secp256k1_public_key;
-use crate::msg::{
-    AirdropInstantiateMsg, ConfigResponse, ExecuteMsg, InstantiateMsg, MigrateMsg, QueryMsg,
-};
 use crate::state::{Config, CONFIG};
 use cosmwasm_std::{
     attr, entry_point, to_binary, Binary, CosmosMsg, Deps, DepsMut, Env, MessageInfo, Response,
     StdError, StdResult, Uint128, WasmMsg,
 };
 use cw2::set_contract_version;
+use genie::airdrop::{QueryMsg as AirdropQueryMsg, StatusResponse};
 use genie::asset::AssetInfo;
+use genie::factory::{
+    AirdropInstantiateMsg, CampaignStatus, ConfigResponse, ExecuteMsg, InstantiateMsg, MigrateMsg,
+    QueryMsg,
+};
 
 const CONTRACT_NAME: &str = "genie-airdrop-factory";
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -132,6 +134,9 @@ pub fn execute_create_airdrop(
 pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
         QueryMsg::Config {} => to_binary(&query_config(deps)?),
+        QueryMsg::CampaignStatuses { addresses } => {
+            to_binary(&query_campaign_statuses(deps, addresses)?)
+        }
     }
 }
 
@@ -143,6 +148,25 @@ pub fn query_config(deps: Deps) -> StdResult<ConfigResponse> {
         public_key: state.public_key,
     };
     Ok(res)
+}
+
+pub fn query_campaign_statuses(
+    deps: Deps,
+    addresses: Vec<String>,
+) -> StdResult<Vec<CampaignStatus>> {
+    addresses
+        .iter()
+        .map(|addr| {
+            let res: StatusResponse = deps
+                .querier
+                .query_wasm_smart(addr, &AirdropQueryMsg::Status {})?;
+
+            Ok(CampaignStatus {
+                address: addr.into(),
+                status: res.status,
+            })
+        })
+        .collect()
 }
 
 #[cfg_attr(not(feature = "library"), entry_point)]

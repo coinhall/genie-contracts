@@ -1,8 +1,4 @@
 use crate::crypto::is_valid_signature;
-use crate::msg::{
-    ClaimResponse, Cw20HookMsg, ExecuteMsg, InstantiateMsg, QueryMsg, Status, StatusResponse,
-    UserInfoResponse,
-};
 use crate::state::{Config, State, CONFIG, STATE, USERS};
 use cosmwasm_std::{
     attr, entry_point, from_binary, to_binary, Binary, Deps, DepsMut, Env, MessageInfo, Order,
@@ -10,6 +6,10 @@ use cosmwasm_std::{
 };
 use cw2::set_contract_version;
 use cw20::Cw20ReceiveMsg;
+use genie::airdrop::{
+    ClaimResponse, Cw20HookMsg, ExecuteMsg, InstantiateMsg, QueryMsg, Status, StatusResponse,
+    UserInfoResponse,
+};
 use genie::asset::{build_transfer_asset_msg, query_balance, AssetInfo};
 
 const CONTRACT_NAME: &str = "genie-airdrop";

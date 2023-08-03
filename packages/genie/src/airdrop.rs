@@ -1,6 +1,6 @@
 use cosmwasm_std::{Binary, Uint128};
 use cw20::Cw20ReceiveMsg;
-use genie::asset::AssetInfo;
+use crate::asset::AssetInfo;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
