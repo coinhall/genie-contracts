@@ -3,6 +3,7 @@ members = [
   "packages/genie",
   "contracts/genie-airdrop",
   "contracts/genie-airdrop-factory",
+  "contracts/genie-raffle",
 ]
 
 [profile.release]
