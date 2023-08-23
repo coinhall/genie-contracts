@@ -6,11 +6,11 @@ use cosmwasm_std::{
 };
 use cw2::set_contract_version;
 use cw20::Cw20ReceiveMsg;
-use genie::airdrop::{
+use genie::asset::{build_transfer_asset_msg, query_balance, AssetInfo};
+use genie::raffle::{
     ClaimResponse, Cw20HookMsg, ExecuteMsg, InstantiateMsg, QueryMsg, Status, StatusResponse,
     UserInfoResponse,
 };
-use genie::asset::{build_transfer_asset_msg, query_balance, AssetInfo};
 
 const CONTRACT_NAME: &str = "genie-airdrop";
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -190,12 +190,20 @@ pub fn handle_claim(
     deps: DepsMut,
     env: Env,
     info: MessageInfo,
-    claim_amounts: Vec<Uint128>,
+    claim_amounts: Binary,
     signature: Binary,
 ) -> Result<Response, StdError> {
     if query_status(deps.as_ref(), &env)?.status != Status::Ongoing {
         return Err(StdError::generic_err("campaign is not ongoing"));
     }
+
+    // convert claim_amounts to string
+    let claim_string = String::from_utf8(claim_amounts.to_vec())?;
+    let claim_string_array = claim_string.split(",").collect::<Vec<&str>>();
+    let claim_amounts = claim_string_array
+        .iter()
+        .map(|x| x.parse::<Uint128>())
+        .collect::<Result<Vec<Uint128>, _>>()?;
 
     let recipient = &info.sender;
     let mut user_info = USERS.load(deps.storage, recipient).unwrap_or_default();
@@ -249,11 +257,15 @@ pub fn handle_claim(
 
     // Transfer assets to the recipient
     let config = &CONFIG.load(deps.storage)?;
-    let messages = vec![build_transfer_asset_msg(
-        recipient,
-        &config.asset,
-        claim_amount,
-    )?];
+    let messages = if claim_amount == Uint128::zero() {
+        vec![]
+    } else {
+        vec![build_transfer_asset_msg(
+            recipient,
+            &config.asset,
+            claim_amount,
+        )?]
+    };
 
     Ok(Response::new().add_messages(messages).add_attributes(vec![
         attr("action", "genie_claim_rewards"),

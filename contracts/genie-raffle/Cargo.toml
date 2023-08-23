@@ -1,5 +1,5 @@
 [package]
-name = "genie-airdrop"
+name = "genie-raffle"
 version = "0.1.0"
 authors = ["Coinhall"]
 edition = "2018"

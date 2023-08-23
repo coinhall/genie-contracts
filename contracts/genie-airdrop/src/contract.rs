@@ -221,7 +221,7 @@ pub fn handle_claim(
     }
 
     let mut claimable_amounts: Vec<Uint128> = vec![];
-    // iterate through claimed_amounts and claim_amount to verify that claim_amount is greater than claimed_amount
+    // iterate through claimed_amounts and claim_amount to verify that claim_amount is greater than/equal claimed_amount
     if user_info.claimed_amounts.is_empty() {
         user_info.claimed_amounts = vec![Uint128::zero(); claim_amounts.len()];
     }

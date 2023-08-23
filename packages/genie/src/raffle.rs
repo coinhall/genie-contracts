@@ -19,7 +19,7 @@ pub struct InstantiateMsg {
 pub enum ExecuteMsg {
     Receive(Cw20ReceiveMsg),
     Claim {
-        claim_amounts: Vec<Uint128>,
+        claim_amounts: Binary,
         signature: Binary,
     },
     IncreaseIncentives {},
