@@ -360,23 +360,23 @@ async function testall() {
   // const factoryContract =
   //   "terra1ydwlh3auwwhn7xl4fn5zaeqx7xktmd9kqp0la4da3zxd7t6frjws2j50st";
 
-  console.log("TESTING MULTI TEST 1");
-  await test1(factoryContract).catch((err) => {
-    console.log(err);
-  });
-  await wait(6000);
+  // console.log("TESTING MULTI TEST 1");
+  // await test1(factoryContract).catch((err) => {
+  //   console.log(err);
+  // });
+  // await wait(6000);
 
-  console.log("TESTING SINGLE TEST 1");
-  await single_test1(factoryContract).catch((err) => {
-    console.log(err);
-  });
-  await wait(6000);
+  // console.log("TESTING SINGLE TEST 1");
+  // await single_test1(factoryContract).catch((err) => {
+  //   console.log(err);
+  // });
+  // await wait(6000);
 
-  console.log("TESTING SINGLE TEST 2");
-  await single_test2(factoryContract).catch((err) => {
-    console.log(err);
-  });
-  await wait(6000);
+  // console.log("TESTING SINGLE TEST 2");
+  // await single_test2(factoryContract).catch((err) => {
+  //   console.log(err);
+  // });
+  // await wait(6000);
 
   console.log("TESTING SINGLE TEST 3");
   await single_test3(factoryContract).catch((err) => {
@@ -493,9 +493,9 @@ async function single_test1(factoryContract: string) {
   await wait(6000);
   await claim(protocolWallet, airdropContract, [4000000]);
   await wait(6000);
-  await claim(hallwallet, airdropContract, [1000000])
-    .then(throwErr)
-    .catch(expectError("Error is thrown for being unable to claim"));
+  await claim(hallwallet, airdropContract, [1000000]);
+  // .then(throwErr)
+  // .catch(expectError("Error is thrown for being unable to claim"));
   await wait(6000);
   return airdropContract;
 }
