@@ -1,6 +1,6 @@
+use crate::asset::AssetInfo;
 use cosmwasm_std::{Binary, Uint128};
 use cw20::Cw20ReceiveMsg;
-use crate::asset::AssetInfo;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
@@ -19,7 +19,7 @@ pub struct InstantiateMsg {
 pub enum ExecuteMsg {
     Receive(Cw20ReceiveMsg),
     Claim {
-        claim_amounts: Vec<Uint128>,
+        claim_amounts: Binary,
         signature: Binary,
     },
     IncreaseIncentives {},

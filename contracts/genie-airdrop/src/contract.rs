@@ -12,7 +12,7 @@ use genie::airdrop::{
 };
 use genie::asset::{build_transfer_asset_msg, query_balance, AssetInfo};
 
-const CONTRACT_NAME: &str = "genie-airdrop";
+const CONTRACT_NAME: &str = "genie-raffle";
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 #[cfg_attr(not(feature = "library"), entry_point)]
@@ -190,12 +190,21 @@ pub fn handle_claim(
     deps: DepsMut,
     env: Env,
     info: MessageInfo,
-    claim_amounts: Vec<Uint128>,
+    claim_amounts: Binary,
     signature: Binary,
 ) -> Result<Response, StdError> {
     if query_status(deps.as_ref(), &env)?.status != Status::Ongoing {
         return Err(StdError::generic_err("campaign is not ongoing"));
     }
+
+    // convert claim_amounts to string
+    let claim_string = String::from_utf8(claim_amounts.to_vec())?;
+    let claim_amounts = claim_string
+        .split(",")
+        .collect::<Vec<&str>>()
+        .iter()
+        .map(|x| x.parse::<Uint128>())
+        .collect::<Result<Vec<Uint128>, _>>()?;
 
     let recipient = &info.sender;
     let mut user_info = USERS.load(deps.storage, recipient).unwrap_or_default();
@@ -221,7 +230,9 @@ pub fn handle_claim(
     }
 
     let mut claimable_amounts: Vec<Uint128> = vec![];
-    // iterate through claimed_amounts and claim_amount to verify that claim_amount is greater than claimed_amount
+    // Iterate through claimed_amounts and claim_amount to verify that claim_amount is greater than/equal claimed_amount
+    // Claimed_amounts are designed to be cumulative so that the user cannot replay
+    // the same claim multiple times to get more rewards
     if user_info.claimed_amounts.is_empty() {
         user_info.claimed_amounts = vec![Uint128::zero(); claim_amounts.len()];
     }
@@ -249,11 +260,15 @@ pub fn handle_claim(
 
     // Transfer assets to the recipient
     let config = &CONFIG.load(deps.storage)?;
-    let messages = vec![build_transfer_asset_msg(
-        recipient,
-        &config.asset,
-        claim_amount,
-    )?];
+    let messages = if claim_amount == Uint128::zero() {
+        vec![]
+    } else {
+        vec![build_transfer_asset_msg(
+            recipient,
+            &config.asset,
+            claim_amount,
+        )?]
+    };
 
     Ok(Response::new().add_messages(messages).add_attributes(vec![
         attr("action", "genie_claim_rewards"),
