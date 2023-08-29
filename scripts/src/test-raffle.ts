@@ -12,7 +12,7 @@ import * as path from "path";
 import * as secp256k1 from "secp256k1";
 import keccak256 from "keccak256";
 
-console.log("Example usage: yarn start src/test.ts --m1");
+console.log("Example usage: yarn start src/test-raffle.ts --m1");
 
 const IS_M1 = process.argv[2] === "--m1";
 const M1_MODIFIER = IS_M1 ? "-aarch64" : "";
@@ -244,12 +244,12 @@ async function increaseLunaIncentives(
 async function claim(
   wallet: Wallet,
   airdropContract: string,
-  amount: number[]
+  amounts: number[]
 ) {
   const private_key = Buffer.from(PRIVATEKEY ?? "", "base64");
   const account = wallet.key.accAddress("terra");
   const claimsContract = airdropContract;
-  const amountstr = amount
+  const amountstr = amounts
     .map((x) => x.toLocaleString("fullwide", { useGrouping: false }))
     .join(",");
   const claimstr = account + "," + amountstr + "," + claimsContract;
@@ -258,13 +258,7 @@ async function claim(
   const signature = Buffer.from(sigObj.signature).toString("base64");
 
   // Generate cosmwasm 'binary' base64 string from amount array
-  let amounts_string = "";
-  for (let i = 0; i < amount.length; i++) {
-    if (i !== 0) {
-      amounts_string += ",";
-    }
-    amounts_string += amount[i].toString();
-  }
+  let amounts_string = amounts.map((amt) => amt.toString()).join(",");
   const claim_amounts_string = Buffer.from(amounts_string).toString("base64");
 
   const claim = new MsgExecuteContract(
@@ -360,23 +354,23 @@ async function testall() {
   // const factoryContract =
   //   "terra1ydwlh3auwwhn7xl4fn5zaeqx7xktmd9kqp0la4da3zxd7t6frjws2j50st";
 
-  // console.log("TESTING MULTI TEST 1");
-  // await test1(factoryContract).catch((err) => {
-  //   console.log(err);
-  // });
-  // await wait(6000);
+  console.log("TESTING MULTI TEST 1");
+  await test1(factoryContract).catch((err) => {
+    console.log(err);
+  });
+  await wait(6000);
 
-  // console.log("TESTING SINGLE TEST 1");
-  // await single_test1(factoryContract).catch((err) => {
-  //   console.log(err);
-  // });
-  // await wait(6000);
+  console.log("TESTING SINGLE TEST 1");
+  await single_test1(factoryContract).catch((err) => {
+    console.log(err);
+  });
+  await wait(6000);
 
-  // console.log("TESTING SINGLE TEST 2");
-  // await single_test2(factoryContract).catch((err) => {
-  //   console.log(err);
-  // });
-  // await wait(6000);
+  console.log("TESTING SINGLE TEST 2");
+  await single_test2(factoryContract).catch((err) => {
+    console.log(err);
+  });
+  await wait(6000);
 
   console.log("TESTING SINGLE TEST 3");
   await single_test3(factoryContract).catch((err) => {

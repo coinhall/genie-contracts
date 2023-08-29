@@ -12,7 +12,7 @@ use genie::raffle::{
     UserInfoResponse,
 };
 
-const CONTRACT_NAME: &str = "genie-airdrop";
+const CONTRACT_NAME: &str = "genie-raffle";
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 #[cfg_attr(not(feature = "library"), entry_point)]
@@ -199,8 +199,9 @@ pub fn handle_claim(
 
     // convert claim_amounts to string
     let claim_string = String::from_utf8(claim_amounts.to_vec())?;
-    let claim_string_array = claim_string.split(",").collect::<Vec<&str>>();
-    let claim_amounts = claim_string_array
+    let claim_amounts = claim_string
+        .split(",")
+        .collect::<Vec<&str>>()
         .iter()
         .map(|x| x.parse::<Uint128>())
         .collect::<Result<Vec<Uint128>, _>>()?;
@@ -229,7 +230,9 @@ pub fn handle_claim(
     }
 
     let mut claimable_amounts: Vec<Uint128> = vec![];
-    // iterate through claimed_amounts and claim_amount to verify that claim_amount is greater than claimed_amount
+    // Iterate through claimed_amounts and claim_amount to verify that claim_amount is greater than/equal claimed_amount
+    // Claimed_amounts are designed to be cumulative so that the user cannot replay
+    // the same claim multiple times to get more rewards
     if user_info.claimed_amounts.is_empty() {
         user_info.claimed_amounts = vec![Uint128::zero(); claim_amounts.len()];
     }

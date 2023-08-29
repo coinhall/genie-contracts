@@ -221,7 +221,9 @@ pub fn handle_claim(
     }
 
     let mut claimable_amounts: Vec<Uint128> = vec![];
-    // iterate through claimed_amounts and claim_amount to verify that claim_amount is greater than/equal claimed_amount
+    // Iterate through claimed_amounts and claim_amount to verify that claim_amount is greater than/equal claimed_amount
+    // Claimed_amounts are designed to be cumulative so that the user cannot replay
+    // the same claim multiple times to get more rewards
     if user_info.claimed_amounts.is_empty() {
         user_info.claimed_amounts = vec![Uint128::zero(); claim_amounts.len()];
     }
