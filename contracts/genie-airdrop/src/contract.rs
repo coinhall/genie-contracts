@@ -12,7 +12,8 @@ use genie::airdrop::{
 };
 use genie::asset::{build_transfer_asset_msg, query_balance, AssetInfo};
 
-const CONTRACT_NAME: &str = "genie-raffle";
+const CONTRACT_NAME: &str = "genie-airdrop";
+
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 #[cfg_attr(not(feature = "library"), entry_point)]
@@ -201,8 +202,6 @@ pub fn handle_claim(
     let claim_string = String::from_utf8(claim_amounts.to_vec())?;
     let claim_amounts = claim_string
         .split(",")
-        .collect::<Vec<&str>>()
-        .iter()
         .map(|x| x.parse::<Uint128>())
         .collect::<Result<Vec<Uint128>, _>>()?;
 
