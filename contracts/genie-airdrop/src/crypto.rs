@@ -18,7 +18,7 @@ pub fn is_valid_signature(
     let msg_buf = msg.as_bytes();
     let keccak_digest = Keccak256::digest(msg_buf);
     let hash = keccak_digest.as_slice();
-    let result = deps.api.secp256k1_verify(&hash, &signature, &public_key);
+    let result = deps.api.secp256k1_verify(hash, signature, public_key);
     match result {
         Ok(true) => Ok(true),
         _ => Ok(false),

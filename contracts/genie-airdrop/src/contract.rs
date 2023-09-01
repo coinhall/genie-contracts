@@ -200,7 +200,7 @@ pub fn handle_claim(
     // convert claim_amounts to string
     let claim_string = String::from_utf8(claim_amounts.to_vec())?;
     let claim_amounts = claim_string
-        .split(",")
+        .split(',')
         .map(|x| x.parse::<Uint128>())
         .collect::<Result<Vec<Uint128>, _>>()?;
 
@@ -217,7 +217,7 @@ pub fn handle_claim(
     // Check if signature is valid
     let is_valid = is_valid_signature(
         &deps,
-        &recipient,
+        recipient,
         &env.contract.address.to_string(),
         claim_amounts.clone(),
         &signature,

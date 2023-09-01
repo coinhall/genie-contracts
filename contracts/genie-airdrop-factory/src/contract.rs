@@ -54,7 +54,6 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> S
             campaign_id,
         } => execute_create_airdrop(
             deps,
-            env,
             info,
             asset_info,
             from_timestamp,
@@ -99,7 +98,6 @@ pub fn execute_update_config(
 
 pub fn execute_create_airdrop(
     deps: DepsMut,
-    _env: Env,
     info: MessageInfo,
     asset_info: AssetInfo,
     from_timestamp: u64,
@@ -124,7 +122,7 @@ pub fn execute_create_airdrop(
                 asset: asset_info,
                 from_timestamp,
                 to_timestamp,
-                public_key: config.public_key.clone(),
+                public_key: config.public_key,
                 allocated_amounts,
             })?,
         })))
