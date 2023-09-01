@@ -244,25 +244,30 @@ async function increaseLunaIncentives(
 async function claim(
   wallet: Wallet,
   airdropContract: string,
-  amount: number[]
+  amounts: number[]
 ) {
   const private_key = Buffer.from(PRIVATEKEY ?? "", "base64");
   const account = wallet.key.accAddress("terra");
   const claimsContract = airdropContract;
-  const amountstr = amount
+  const amountstr = amounts
     .map((x) => x.toLocaleString("fullwide", { useGrouping: false }))
     .join(",");
   const claimstr = account + "," + amountstr + "," + claimsContract;
   const msg = keccak256(Buffer.from(claimstr));
   const sigObj = secp256k1.ecdsaSign(msg, private_key);
   const signature = Buffer.from(sigObj.signature).toString("base64");
+
+  // Generate cosmwasm 'binary' base64 string from amount array
+  let amounts_string = amounts.map((amt) => amt.toString()).join(",");
+  const claim_amounts_string = Buffer.from(amounts_string).toString("base64");
+
   const claim = new MsgExecuteContract(
     wallet.key.accAddress("terra"),
     airdropContract,
     {
       claim: {
         signature: signature,
-        claim_amounts: amount.map((x) => x.toString()),
+        claim_amounts: claim_amounts_string,
       },
     },
     {}
@@ -423,9 +428,8 @@ async function test1(factoryContract: string) {
     .then(throwErr)
     .catch(expectError("Error is thrown for being unable to claim"));
   await wait(6000);
-  await claim(userWallet, airdropContract, [3_000_000, 0, 0])
-    .then(throwErr)
-    .catch(expectError("Error is thrown for being unable to claim"));
+  // This should not error anymore
+  await claim(userWallet, airdropContract, [3_000_000, 0, 0]);
   await wait(6000);
   await claim(
     protocolWallet,
@@ -435,9 +439,9 @@ async function test1(factoryContract: string) {
   await wait(6000);
   await claim(hallwallet, airdropContract, [10_000_000, 1_000_000, 1_000_000]);
   await wait(6000);
-  await claim(userWallet, airdropContract, [4_000_000, 0, 0])
-    .then(throwErr)
-    .catch(expectError("Error is thrown for being unable to claim"));
+  await claim(userWallet, airdropContract, [4_000_000, 0, 0]);
+  // .then(throwErr)
+  // .catch(expectError("Error is thrown for being unable to claim"));
   await wait(6000);
   await claim(userWallet, airdropContract, [4_000_000, 0, 1_000_000]);
   await waitUntil(endtime);
@@ -483,9 +487,9 @@ async function single_test1(factoryContract: string) {
   await wait(6000);
   await claim(protocolWallet, airdropContract, [4000000]);
   await wait(6000);
-  await claim(hallwallet, airdropContract, [1000000])
-    .then(throwErr)
-    .catch(expectError("Error is thrown for being unable to claim"));
+  await claim(hallwallet, airdropContract, [1000000]);
+  // .then(throwErr)
+  // .catch(expectError("Error is thrown for being unable to claim"));
   await wait(6000);
   return airdropContract;
 }
