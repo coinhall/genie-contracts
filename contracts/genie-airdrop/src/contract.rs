@@ -13,7 +13,6 @@ use genie::airdrop::{
 use genie::asset::{build_transfer_asset_msg, query_balance, AssetInfo};
 
 const CONTRACT_NAME: &str = "genie-airdrop";
-
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 #[cfg_attr(not(feature = "library"), entry_point)]
