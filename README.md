@@ -1,14 +1,18 @@
 # `genie-contracts`
 
-**Powering [Genie campaigns](https://genie.coinhall.org).**
+**🧞 Powering [Genie campaigns](https://genie.coinhall.org).**
 
 ## Contracts
 
-- [`genie-airdrop-factory`](contracts/genie-airdrop-factory/README.md): factory contract for `genie-airdrop`
-  - Mainnet code ID: `1683`
-  - Mainnet contract: `terra1dcfnzx0lh27w7rjh69e6kl5838dc7yyjj3r3h84jmkjjf08kknuqxr0x3r`
-- [`genie-airdrop`](contracts/genie-airdrop/README.md): contract which users claim rewards from
-  - Mainnet code ID: `1682`
+This repository has two main contracts:
+
+1. [**`genie-airdrop`**](./contracts/genie-airdrop/README.md): the contract to be instantiated per campaign, and which end users claim rewards from
+   - Deployed `phoenix-1` code ID: `1682`
+2. [**`genie-airdrop-factory`**](./contracts/genie-airdrop-factory/README.md): the factory contract to instantiate the `genie-airdrop` contract
+   - Deployed `phoenix-1` code ID: `1683`
+   - Deployed `phoenix-1` contract: `terra1dcfnzx0lh27w7rjh69e6kl5838dc7yyjj3r3h84jmkjjf08kknuqxr0x3r`
+
+Refer to their respective READMEs for more information about how they work.
 
 ## Installing
 
@@ -27,8 +31,12 @@ rustup target add wasm32-unknown-unknown
 
 ## Building
 
-Run in the root of this project to produce an optimised build in the `~/artifacts` directory:
+Run in the root of this project to produce an optimised build in the `artifacts` directory:
 
 ```sh
 ./build.sh
 ```
+
+## Testing
+
+See [`./scripts`](./scripts/README.md) for details of the full E2E test using the `pisco-1` testnet.

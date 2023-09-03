@@ -1,33 +1,33 @@
 # Scripts
 
-This file contains useful scripts for testing out the Genie contracts.
+This directory contains useful scripts for generating keys and running the full E2E tests of the Genie contracts against the `pisco-1` testnet.
 
 ## Generating Keys
 
+> **WARNING**: in production, the private key MUST be kept as a sensitive secret.
+
+To generate a private-public key pair that this contract requires:
+
 ```bash
-# WARNING: the private key must be kept as a sensitive secret in production.
 yarn start src/keygen.ts
 ```
 
-## Signing Messages
+## Running E2E Tests
 
-```bash
-yarn start src/sign.ts <PUBLIC_KEY> <PRIVATE_KEY>
-```
+> **Note**: The testnet RPC may occasionally take a longer time to process incoming transactions. A delay of 6s is added between each transaction, and a minimum delay of 60s is added whenever it is needed to wait until a certain timestamp. This covers for most cases, but the tests might still fail for this reason. For more accurate testing, and to avoid spamming the testnet, a localnet could be setup in the future.
 
-## Testing Using Testnet
-
-Follow the below steps to test the contracts using testnet.
+These tests are written to target the `pisco-1` testnet.
 
 ### Setup
 
-1. Create a `.env` file in `/config` dir:
+1. Create a `.env` file in `/config` dir (make sure these are NOT production secrets):
 
    ```sh
-   # WARNING: make sure these secrets are not production secrets!
+   # WARNING: make sure these are NOT production secrets!
    SEED_PHRASE='add twenty four word seed phrase'
    PROTOCOL_PHRASE='add twenty four word seed phrase'
    USER_PHRASE='add twenty four word seed phrase'
+   # See 'Generating Keys' to generate these keys:
    PUBLICKEY='anyBase64+secp256k1PublicKey+in/Base64'
    PRIVATEKEY='matching+secp256k1PublicKey+in/Base64'
    ```
@@ -38,7 +38,5 @@ Follow the below steps to test the contracts using testnet.
 
 ### Running
 
-1. Ensure the wasm files are built; if not, run `./build.sh` in the root of the project
-2. Then, run `yarn start src/test.ts`
-
-> The testnet RPC may occasionally take a longer time to process incoming transactions. A delay of 6s is added between each transaction, and a minimum delay of 60s is added whenever it is needed to wait until a certain timestamp. This covers for most cases, but the tests might still fail for this reason. For more accurate testing, and to avoid spamming the testnet, a localnet could be setup in the future.
+1. Run `./build.sh` in the root of the project to build the wasm files
+2. Then, run `yarn start src/test.ts` and observe the results
