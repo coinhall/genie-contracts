@@ -1,8 +1,8 @@
 use crate::crypto::check_secp256k1_public_key;
-use crate::state::{Config, CONFIG};
+use crate::state::{Config, CAMPAIGN_ID_MAP, CONFIG};
 use cosmwasm_std::{
-    attr, entry_point, to_binary, Binary, CosmosMsg, Deps, DepsMut, Env, MessageInfo, Response,
-    StdError, StdResult, Uint128, WasmMsg,
+    attr, entry_point, to_binary, Binary, CosmosMsg, Deps, DepsMut, Empty, Env, MessageInfo,
+    Response, StdError, StdResult, Uint128, WasmMsg,
 };
 use cw2::set_contract_version;
 use genie::airdrop::{QueryMsg as AirdropQueryMsg, StatusResponse};
@@ -106,6 +106,16 @@ pub fn execute_create_airdrop(
     campaign_id: String,
 ) -> StdResult<Response> {
     let config: Config = CONFIG.load(deps.storage)?;
+
+    // check the campaign id map for duplicates
+    if CAMPAIGN_ID_MAP
+        .may_load(deps.storage, campaign_id.clone())?
+        .is_some()
+    {
+        return Err(StdError::generic_err("campaign id already exists"));
+    }
+    // update the campaign id map
+    CAMPAIGN_ID_MAP.save(deps.storage, campaign_id.clone(), &Empty {})?;
 
     Ok(Response::new()
         .add_attributes(vec![
