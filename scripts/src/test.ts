@@ -462,7 +462,7 @@ async function single_test1(factoryContract: string) {
     [5000000],
     starttime,
     endtime,
-    "1"
+    "2"
   );
   await wait(6000);
   await increaseIncentives(
@@ -504,7 +504,7 @@ async function single_test2(factoryContract: string) {
     [5000000],
     starttime,
     endtime,
-    "2"
+    "3"
   );
   await wait(6000);
   await increaseLunaIncentives(protocolWallet, airdropContract, 2000000);
@@ -532,7 +532,7 @@ async function single_test3(factoryContract: string) {
     [5000000],
     starttime,
     endtime,
-    "3"
+    "4"
   );
   await wait(6000);
   await increaseIncentives(
