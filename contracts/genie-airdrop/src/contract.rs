@@ -1,8 +1,8 @@
 use crate::crypto::is_valid_signature;
 use crate::state::{Config, State, CONFIG, STATE, USERS};
 use cosmwasm_std::{
-    attr, entry_point, from_binary, to_binary, Binary, Deps, DepsMut, Env, MessageInfo, Order,
-    Response, StdError, StdResult, Uint128,
+    attr, entry_point, from_binary, to_binary, Binary, Deps, DepsMut, Env, MessageInfo, Response,
+    StdError, StdResult, Uint128,
 };
 use cw2::set_contract_version;
 use cw20::Cw20ReceiveMsg;
@@ -366,14 +366,12 @@ fn query_has_user_claimed(deps: Deps, user_address: String) -> StdResult<ClaimRe
 
 fn query_status(deps: Deps, env: &Env) -> StdResult<StatusResponse> {
     let config = CONFIG.load(deps.storage)?;
-    let users_count = USERS
-        .range(deps.storage, None, None, Order::Ascending)
-        .count();
+    let users_is_empty = USERS.is_empty(deps.storage);
     let state = STATE.load(deps.storage)?;
     let current_amount = state.protocol_funding;
 
     if env.block.time.seconds() >= config.from_timestamp
-        && users_count == usize::from(0u8)
+        && users_is_empty
         && current_amount < config.allocated_amount
     {
         Ok(StatusResponse {

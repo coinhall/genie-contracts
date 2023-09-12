@@ -36,7 +36,7 @@ optimize-m1 = """docker run --rm -v "$(pwd)":/code \
 [dependencies]
 genie = { path = "../../packages/genie", default-features = false, version = "0.1.0" }
 cosmwasm-std = "1.0.0"
-cw-storage-plus = "0.13.2"
+cw-storage-plus = "1.1.0"
 cw2 = "0.13.4"
 cw-controllers = "0.13.2"
 schemars = "0.8.8"
