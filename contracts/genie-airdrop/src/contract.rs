@@ -23,7 +23,7 @@ pub fn instantiate(
     msg: InstantiateMsg,
 ) -> StdResult<Response> {
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
-    if msg.from_timestamp >= _env.block.time.seconds() {
+    if msg.from_timestamp <= _env.block.time.seconds() {
         return Err(StdError::generic_err(
             "from_timestamp must be greater than current time",
         ));
