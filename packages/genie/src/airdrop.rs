@@ -67,6 +67,3 @@ pub enum Status {
 pub struct StatusResponse {
     pub status: Status,
 }
-
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
-pub struct MigrateMsg {}

@@ -116,6 +116,10 @@ pub fn execute_create_airdrop(
     }
     // update the campaign id map
     CAMPAIGN_ID_MAP.save(deps.storage, campaign_id.clone(), &Empty {})?;
+  
+    if allocated_amounts.len() > 5 {
+        return Err(StdError::generic_err("too many allocation amounts"));
+    }
 
     Ok(Response::new()
         .add_attributes(vec![
