@@ -107,6 +107,10 @@ pub fn execute_create_airdrop(
 ) -> StdResult<Response> {
     let config: Config = CONFIG.load(deps.storage)?;
 
+    if allocated_amounts.len() > 5 {
+        return Err(StdError::generic_err("too many allocation amounts"));
+    }
+
     Ok(Response::new()
         .add_attributes(vec![
             attr("action", "genie_create_campaign"),
