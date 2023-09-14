@@ -18,12 +18,12 @@ const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn instantiate(
     deps: DepsMut,
-    _env: Env,
+    env: Env,
     _info: MessageInfo,
     msg: InstantiateMsg,
 ) -> StdResult<Response> {
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
-    if msg.from_timestamp <= _env.block.time.seconds() {
+    if msg.from_timestamp <= env.block.time.seconds() {
         return Err(StdError::generic_err(
             "from_timestamp must be greater than current time",
         ));
