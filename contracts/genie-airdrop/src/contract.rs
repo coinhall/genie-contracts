@@ -1,4 +1,4 @@
-use crate::crypto::is_valid_signature;
+use crate::crypto::{is_valid_signature, is_valid_lootbox_signature};
 use crate::state::{Config, State, CONFIG, STATE, USERS};
 use cosmwasm_std::{
     attr, entry_point, from_binary, to_binary, Binary, Deps, DepsMut, Env, MessageInfo, Response,
@@ -7,8 +7,8 @@ use cosmwasm_std::{
 use cw2::set_contract_version;
 use cw20::Cw20ReceiveMsg;
 use genie::airdrop::{
-    ClaimResponse, Cw20HookMsg, ExecuteMsg, InstantiateMsg, QueryMsg, Status, StatusResponse,
-    UserInfoResponse,
+    ClaimResponse, Cw20HookMsg, ExecuteMsg, InstantiateMsg, LootBoxInfo, QueryMsg, Status,
+    StatusResponse, UserInfoResponse, UserLootBoxInfoResponse,
 };
 use genie::asset::{build_transfer_asset_msg, query_balance, AssetInfo};
 
@@ -74,7 +74,8 @@ pub fn execute(
         ExecuteMsg::Claim {
             claim_amounts,
             signature,
-        } => handle_claim(deps, env, info, claim_amounts, signature),
+            lootbox_info,
+        } => handle_claim(deps, env, info, claim_amounts, signature, lootbox_info),
         ExecuteMsg::TransferUnclaimedTokens { recipient, amount } => {
             handle_transfer_unclaimed_tokens(deps, env, info, recipient, amount)
         }
@@ -89,6 +90,9 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> StdResult<Binary> {
         QueryMsg::HasUserClaimed { address } => to_binary(&query_has_user_claimed(deps, address)?),
         QueryMsg::UserInfo { address } => to_binary(&query_user_info(deps, address)?),
         QueryMsg::Status {} => to_binary(&query_status(deps, &env)?),
+        QueryMsg::UserLootBoxInfo { address } => {
+            to_binary(&query_user_lootbox_data(deps, address)?)
+        }
     }
 }
 
@@ -197,6 +201,7 @@ pub fn handle_claim(
     info: MessageInfo,
     claim_amounts: Binary,
     signature: Binary,
+    lootbox_info: Option<LootBoxInfo>,
 ) -> Result<Response, StdError> {
     if query_status(deps.as_ref(), &env)?.status != Status::Ongoing {
         return Err(StdError::generic_err("campaign is not ongoing"));
@@ -219,7 +224,7 @@ pub fn handle_claim(
         ));
     }
 
-    // Check if signature is valid
+    // Check if claim_amounts signature is valid
     let is_valid = is_valid_signature(
         &deps,
         recipient,
@@ -252,6 +257,42 @@ pub fn handle_claim(
         user_info.claimed_amounts[i] =
             user_info.claimed_amounts[i].checked_add(actual_claim_amount)?;
         claimable_amounts.push(actual_claim_amount);
+    }
+
+    // Lootbox specific logic
+    // Convert lootbox_amounts to string
+    if let Some(lootbox_info) = lootbox_info {
+        let lootbox_amounts_binary = lootbox_info.claimed_lootbox;
+        let lootbox_signature = lootbox_info.signature;
+        let lootbox_amounts_string = String::from_utf8(lootbox_amounts_binary.to_vec())?;
+        let lootbox_amounts = lootbox_amounts_string
+            .split(',')
+            .map(|x| x.parse::<Uint128>())
+            .collect::<Result<Vec<Uint128>, _>>()?;
+
+        // Vec length must coincide with mission length
+        if lootbox_amounts.len() != claim_amounts.len() {
+            return Err(StdError::generic_err(
+                "lootbox amounts length does not match claimable amount length",
+            ));
+        }
+
+        // Check if lootbox_amounts signature is valid
+        let is_valid = is_valid_lootbox_signature(
+            &deps,
+            recipient,
+            &env.contract.address.to_string(),
+            lootbox_amounts.clone(),
+            &lootbox_signature,
+            &CONFIG.load(deps.storage)?.public_key,
+        )?;
+        if !is_valid {
+            return Err(StdError::generic_err(
+                "lootbox signature verification failed",
+            ));
+        }
+
+        user_info.claimed_lootbox = Some(lootbox_amounts);
     }
 
     USERS.save(deps.storage, recipient, &user_info)?;
@@ -392,4 +433,17 @@ fn query_status(deps: Deps, env: &Env) -> StdResult<StatusResponse> {
             status: Status::Ended,
         })
     }
+}
+
+fn query_user_lootbox_data(deps: Deps, user_address: String) -> StdResult<UserLootBoxInfoResponse> {
+    let user_address = deps.api.addr_validate(&user_address)?;
+    let user_info = USERS
+        .may_load(deps.storage, &user_address)?
+        .unwrap_or_default();
+    let claimed_lootbox = if let Some(claimed_lootbox) = user_info.claimed_lootbox {
+        claimed_lootbox
+    } else {
+        Vec::new()
+    };
+    Ok(UserLootBoxInfoResponse { claimed_lootbox })
 }

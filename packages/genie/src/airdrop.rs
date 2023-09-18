@@ -21,6 +21,7 @@ pub enum ExecuteMsg {
     Claim {
         claim_amounts: Binary,
         signature: Binary,
+        lootbox_info: Option<LootBoxInfo>,
     },
     IncreaseIncentives {},
     TransferUnclaimedTokens {
@@ -43,6 +44,7 @@ pub enum QueryMsg {
     State {},
     UserInfo { address: String },
     HasUserClaimed { address: String },
+    UserLootboxInfo { address: String },
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
@@ -56,6 +58,11 @@ pub struct ClaimResponse {
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+pub struct UserLootBoxInfoResponse {
+    pub claimed_lootbox: Vec<Uint128>,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub enum Status {
     NotStarted,
     Ongoing,
@@ -66,4 +73,10 @@ pub enum Status {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct StatusResponse {
     pub status: Status,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+pub struct LootBoxInfo {
+    pub claimed_lootbox: Binary,
+    pub signature: Binary,
 }
