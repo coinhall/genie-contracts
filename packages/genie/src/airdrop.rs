@@ -21,7 +21,7 @@ pub enum ExecuteMsg {
     Claim {
         claim_amounts: Binary,
         signature: Binary,
-        lootbox_info: Option<LootBoxInfo>,
+        lootbox_info: Option<LootboxInfo>,
     },
     IncreaseIncentives {},
     TransferUnclaimedTokens {
@@ -58,7 +58,7 @@ pub struct ClaimResponse {
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
-pub struct UserLootBoxInfoResponse {
+pub struct UserLootboxInfoResponse {
     pub claimed_lootbox: Vec<Uint128>,
 }
 
@@ -76,6 +76,6 @@ pub struct StatusResponse {
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
-pub struct LootBoxInfo {
+pub struct LootboxInfo {
     pub claimed_lootbox: Binary,
 }

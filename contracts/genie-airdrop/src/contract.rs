@@ -7,8 +7,8 @@ use cosmwasm_std::{
 use cw2::set_contract_version;
 use cw20::Cw20ReceiveMsg;
 use genie::airdrop::{
-    ClaimResponse, Cw20HookMsg, ExecuteMsg, InstantiateMsg, LootBoxInfo, QueryMsg, Status,
-    StatusResponse, UserInfoResponse, UserLootBoxInfoResponse,
+    ClaimResponse, Cw20HookMsg, ExecuteMsg, InstantiateMsg, LootboxInfo, QueryMsg, Status,
+    StatusResponse, UserInfoResponse, UserLootboxInfoResponse,
 };
 use genie::asset::{build_transfer_asset_msg, query_balance, AssetInfo};
 
@@ -201,7 +201,7 @@ pub fn handle_claim(
     info: MessageInfo,
     claim_amounts: Binary,
     signature: Binary,
-    lootbox_info: Option<LootBoxInfo>,
+    lootbox_info: Option<LootboxInfo>,
 ) -> Result<Response, StdError> {
     if query_status(deps.as_ref(), &env)?.status != Status::Ongoing {
         return Err(StdError::generic_err("campaign is not ongoing"));
@@ -424,7 +424,7 @@ fn query_status(deps: Deps, env: &Env) -> StdResult<StatusResponse> {
     }
 }
 
-fn query_user_lootbox_data(deps: Deps, user_address: String) -> StdResult<UserLootBoxInfoResponse> {
+fn query_user_lootbox_data(deps: Deps, user_address: String) -> StdResult<UserLootboxInfoResponse> {
     let user_address = deps.api.addr_validate(&user_address)?;
     let user_info = USERS
         .may_load(deps.storage, &user_address)?
@@ -434,5 +434,5 @@ fn query_user_lootbox_data(deps: Deps, user_address: String) -> StdResult<UserLo
     } else {
         Vec::new()
     };
-    Ok(UserLootBoxInfoResponse { claimed_lootbox })
+    Ok(UserLootboxInfoResponse { claimed_lootbox })
 }
