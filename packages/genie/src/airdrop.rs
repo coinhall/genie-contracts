@@ -78,5 +78,4 @@ pub struct StatusResponse {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct LootBoxInfo {
     pub claimed_lootbox: Binary,
-    pub signature: Binary,
 }

@@ -1,4 +1,4 @@
-use crate::crypto::{is_valid_signature, is_valid_lootbox_signature};
+use crate::crypto::is_valid_signature;
 use crate::state::{Config, State, CONFIG, STATE, USERS};
 use cosmwasm_std::{
     attr, entry_point, from_binary, to_binary, Binary, Deps, DepsMut, Env, MessageInfo, Response,
@@ -90,7 +90,7 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> StdResult<Binary> {
         QueryMsg::HasUserClaimed { address } => to_binary(&query_has_user_claimed(deps, address)?),
         QueryMsg::UserInfo { address } => to_binary(&query_user_info(deps, address)?),
         QueryMsg::Status {} => to_binary(&query_status(deps, &env)?),
-        QueryMsg::UserLootBoxInfo { address } => {
+        QueryMsg::UserLootboxInfo { address } => {
             to_binary(&query_user_lootbox_data(deps, address)?)
         }
     }
@@ -259,42 +259,6 @@ pub fn handle_claim(
         claimable_amounts.push(actual_claim_amount);
     }
 
-    // Lootbox specific logic
-    // Convert lootbox_amounts to string
-    if let Some(lootbox_info) = lootbox_info {
-        let lootbox_amounts_binary = lootbox_info.claimed_lootbox;
-        let lootbox_signature = lootbox_info.signature;
-        let lootbox_amounts_string = String::from_utf8(lootbox_amounts_binary.to_vec())?;
-        let lootbox_amounts = lootbox_amounts_string
-            .split(',')
-            .map(|x| x.parse::<Uint128>())
-            .collect::<Result<Vec<Uint128>, _>>()?;
-
-        // Vec length must coincide with mission length
-        if lootbox_amounts.len() != claim_amounts.len() {
-            return Err(StdError::generic_err(
-                "lootbox amounts length does not match claimable amount length",
-            ));
-        }
-
-        // Check if lootbox_amounts signature is valid
-        let is_valid = is_valid_lootbox_signature(
-            &deps,
-            recipient,
-            &env.contract.address.to_string(),
-            lootbox_amounts.clone(),
-            &lootbox_signature,
-            &CONFIG.load(deps.storage)?.public_key,
-        )?;
-        if !is_valid {
-            return Err(StdError::generic_err(
-                "lootbox signature verification failed",
-            ));
-        }
-
-        user_info.claimed_lootbox = Some(lootbox_amounts);
-    }
-
     USERS.save(deps.storage, recipient, &user_info)?;
     // save the new state
     STATE.save(deps.storage, &state)?;
@@ -314,7 +278,7 @@ pub fn handle_claim(
         )?]
     };
 
-    Ok(Response::new().add_messages(messages).add_attributes(vec![
+    let mut attributes = vec![
         attr("action", "genie_claim_rewards"),
         attr("receiver", recipient),
         attr("asset", config.asset.asset_string()),
@@ -335,7 +299,32 @@ pub fn handle_claim(
                 .collect::<Vec<String>>()
                 .join(","),
         ),
-    ]))
+    ];
+
+    // Lootbox specific logic
+    // Convert lootbox_amounts to string
+    if let Some(lootbox_info) = lootbox_info {
+        let lootbox_amounts_binary = lootbox_info.claimed_lootbox;
+        let lootbox_amounts_string = String::from_utf8(lootbox_amounts_binary.to_vec())?;
+        let lootbox_amounts = lootbox_amounts_string
+            .split(',')
+            .map(|x| x.parse::<Uint128>())
+            .collect::<Result<Vec<Uint128>, _>>()?;
+
+        // Vec length must coincide with mission length
+        if lootbox_amounts.len() != claim_amounts.len() {
+            return Err(StdError::generic_err(
+                "lootbox amounts length does not match claimable amount length",
+            ));
+        }
+
+        user_info.claimed_lootbox = Some(lootbox_amounts);
+        attributes.push(attr("claimed_lootbox", lootbox_amounts_string))
+    }
+
+    Ok(Response::new()
+        .add_messages(messages)
+        .add_attributes(attributes))
 }
 
 pub fn handle_transfer_unclaimed_tokens(
