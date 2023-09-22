@@ -219,6 +219,41 @@ async function increaseIncentives(
   const res = await terra.tx.broadcast(tx, "pisco-1");
   console.log(res);
 }
+
+async function topupIncentives(
+  wallet: Wallet,
+  token_contract: string,
+  amount: number[],
+  airdropContract: string
+) {
+  const astroSend = {
+    send: {
+      contract: airdropContract,
+      amount: amount.toString(),
+      msg: Buffer.from(
+        JSON.stringify({
+          topup_incentives: {},
+        })
+      ).toString("base64"),
+    },
+  };
+  const sendTokens = new MsgExecuteContract(
+    wallet.key.accAddress("terra"),
+    token_contract,
+    astroSend,
+    {}
+  );
+
+  const tx = await wallet.createAndSignTx({
+    msgs: [sendTokens],
+    chainID: "pisco-1",
+  });
+  console.log(tx);
+  console.log("----------------------------------");
+  const res = await terra.tx.broadcast(tx, "pisco-1");
+  console.log(res);
+}
+
 async function increaseLunaIncentives(
   wallet: Wallet,
   airdropContract: string,
@@ -351,32 +386,35 @@ async function testall() {
   });
   await wait(6000);
 
-  // const factoryContract =
-  //   "terra1ydwlh3auwwhn7xl4fn5zaeqx7xktmd9kqp0la4da3zxd7t6frjws2j50st";
-
   console.log("TESTING MULTI TEST 1");
   await test1(factoryContract).catch((err) => {
     console.log(err);
   });
   await wait(6000);
 
-  console.log("TESTING SINGLE TEST 1");
-  await single_test1(factoryContract).catch((err) => {
-    console.log(err);
-  });
-  await wait(6000);
+  // console.log("TESTING SINGLE TEST 1");
+  // await single_test1(factoryContract).catch((err) => {
+  //   console.log(err);
+  // });
+  // await wait(6000);
 
-  console.log("TESTING SINGLE TEST 2");
-  await single_test2(factoryContract).catch((err) => {
-    console.log(err);
-  });
-  await wait(6000);
+  // console.log("TESTING SINGLE TEST 2");
+  // await single_test2(factoryContract).catch((err) => {
+  //   console.log(err);
+  // });
+  // await wait(6000);
 
-  console.log("TESTING SINGLE TEST 3");
-  await single_test3(factoryContract).catch((err) => {
-    console.log(err);
-  });
-  await wait(6000);
+  // console.log("TESTING SINGLE TEST 3");
+  // await single_test3(factoryContract).catch((err) => {
+  //   console.log(err);
+  // });
+  // await wait(6000);
+
+  // console.log("TESTING TOPUP TEST");
+  // await topup_test(factoryContract).catch((err) => {
+  //   console.log(err);
+  // });
+  // await wait(6000);
 
   console.log("DONE TESTING");
 }
@@ -545,4 +583,54 @@ async function single_test3(factoryContract: string) {
   await claim(userWallet, airdropContract, [2000000]);
   await waitUntil(endtime);
   await transferUnclaimedTokens(protocolWallet, airdropContract, 4000000);
+}
+
+/*
+  Campaign 2000, 5000
+  Claim    3000, 3000
+  Topup    2000, 2000
+  Claim    3000, 3000
+  End 
+  Transfer 5000
+
+
+*/
+async function topup_test(factoryContract: string) {
+  const starttime = Math.trunc(Date.now() / 1000 + 50);
+  const endtime = Math.trunc(Date.now() / 1000 + 150);
+
+  const airdropContract = await createAirdrop(
+    protocolWallet,
+    factoryContract,
+    asset_info,
+    [10_000_000, 20_000_000, 20_000_000],
+    starttime,
+    endtime,
+    "4"
+  );
+
+  await wait(6000);
+  await increaseIncentives(
+    protocolWallet,
+    TOKEN_CONTRACT,
+    7000,
+    airdropContract
+  );
+  await waitUntil(starttime);
+  await claim(userWallet, airdropContract, [3000, 3000]);
+  await wait(6000);
+
+  await topupIncentives(
+    protocolWallet,
+    TOKEN_CONTRACT,
+    [2000, 2000],
+    airdropContract
+  );
+  await wait(6000);
+
+  await claim(userWallet, airdropContract, [3000, 3000]);
+  await waitUntil(endtime);
+  await transferUnclaimedTokens(protocolWallet, airdropContract, 5000);
+
+  return airdropContract;
 }

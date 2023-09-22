@@ -79,6 +79,9 @@ pub fn execute(
         ExecuteMsg::TransferUnclaimedTokens { recipient, amount } => {
             handle_transfer_unclaimed_tokens(deps, env, info, recipient, amount)
         }
+        ExecuteMsg::TopUpIncentives { topup_amounts } => {
+            handle_topup_native_incentives(deps, env, info, topup_amounts)
+        }
     }
 }
 
@@ -128,6 +131,13 @@ pub fn receive_cw20(
         Cw20HookMsg::IncreaseIncentives {} => {
             handle_increase_cw20_incentives(deps, env, config.asset.asset_string(), cw20_msg.amount)
         }
+        Cw20HookMsg::TopUpIncentives { topup_amounts } => handle_topup_cw20_incentives(
+            deps,
+            env,
+            config.asset.asset_string(),
+            cw20_msg.amount,
+            topup_amounts,
+        ),
     }
 }
 
@@ -145,6 +155,52 @@ pub fn handle_increase_cw20_incentives(
     let mut state = STATE.load(deps.storage)?;
     state.protocol_funding += amount;
     STATE.save(deps.storage, &state)?;
+
+    Ok(Response::new().add_attributes(vec![
+        attr("action", "genie_increase_rewards"),
+        attr("asset", asset),
+        attr("protocol_funding", state.protocol_funding),
+    ]))
+}
+
+pub fn handle_topup_cw20_incentives(
+    deps: DepsMut,
+    env: Env,
+    asset: String,
+    amount: Uint128,
+    topup_amounts: Vec<Uint128>,
+) -> Result<Response, StdError> {
+    if query_status(deps.as_ref(), &env)?.status != Status::Ongoing {
+        return Err(StdError::generic_err(
+            "topup can only be done while campaign is ongoing",
+        ));
+    }
+
+    let mut state = STATE.load(deps.storage)?;
+    let mut config = CONFIG.load(deps.storage)?;
+
+    if topup_amounts.len() != state.unclaimed_amounts.len() {
+        return Err(StdError::generic_err(
+            "topup amount length does not match claimable amount length",
+        ));
+    }
+
+    let sum = topup_amounts.iter().sum::<Uint128>();
+    if amount != sum {
+        return Err(StdError::generic_err(
+            "topup amount does not match the amount sent",
+        ));
+    }
+
+    state.protocol_funding += amount;
+    STATE.save(deps.storage, &state)?;
+
+    config.allocated_amount += amount;
+    CONFIG.save(deps.storage, &config)?;
+
+    for (i, topup_amount) in topup_amounts.iter().enumerate() {
+        state.unclaimed_amounts[i] = state.unclaimed_amounts[i].checked_add(*topup_amount)?;
+    }
 
     Ok(Response::new().add_attributes(vec![
         attr("action", "genie_increase_rewards"),
@@ -187,6 +243,71 @@ pub fn handle_increase_native_incentives(
     let mut state = STATE.load(deps.storage)?;
     state.protocol_funding += increase_amount;
     STATE.save(deps.storage, &state)?;
+
+    Ok(Response::new().add_attributes(vec![
+        attr("action", "genie_increase_rewards"),
+        attr("asset", config.asset.asset_string()),
+        attr("protocol_funding", state.protocol_funding),
+    ]))
+}
+
+pub fn handle_topup_native_incentives(
+    deps: DepsMut,
+    env: Env,
+    info: MessageInfo,
+    topup_amounts: Vec<Uint128>,
+) -> Result<Response, StdError> {
+    if query_status(deps.as_ref(), &env)?.status != Status::Ongoing {
+        return Err(StdError::generic_err(
+            "topup can only be done while campaign is ongoing",
+        ));
+    }
+
+    let config = CONFIG.load(deps.storage)?;
+    if info.sender != config.owner {
+        return Err(StdError::generic_err("can only be called by owner"));
+    }
+
+    let increase_amount: Uint128 = match config.asset.clone() {
+        AssetInfo::NativeToken { denom } => info
+            .funds
+            .iter()
+            .filter(|coin| coin.denom == denom)
+            .map(|coin| coin.amount)
+            .sum(),
+        AssetInfo::Token { contract_addr: _ } => {
+            return Err(StdError::generic_err("invalid asset type"));
+        }
+    };
+    if increase_amount.is_zero() {
+        return Err(StdError::generic_err("amount must be greater than 0"));
+    }
+
+    let mut state = STATE.load(deps.storage)?;
+
+    if topup_amounts.len() != state.unclaimed_amounts.len() {
+        return Err(StdError::generic_err(
+            "topup amount length does not match claimable amount length",
+        ));
+    }
+
+    let sum = topup_amounts.iter().sum::<Uint128>();
+    if increase_amount != sum {
+        return Err(StdError::generic_err(
+            "topup amount does not match the amount sent",
+        ));
+    }
+
+    state.protocol_funding += increase_amount;
+    STATE.save(deps.storage, &state)?;
+
+    let mut config = CONFIG.load(deps.storage)?;
+    config.allocated_amount += increase_amount;
+    CONFIG.save(deps.storage, &config)?;
+
+    for (i, topup_amount) in topup_amounts.iter().enumerate() {
+        state.unclaimed_amounts[i] = state.unclaimed_amounts[i].checked_add(*topup_amount)?;
+    }
 
     Ok(Response::new().add_attributes(vec![
         attr("action", "genie_increase_rewards"),

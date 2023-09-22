@@ -28,12 +28,16 @@ pub enum ExecuteMsg {
         recipient: String,
         amount: Uint128,
     },
+    TopUpIncentives {
+        topup_amounts: Vec<Uint128>,
+    },
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum Cw20HookMsg {
     IncreaseIncentives {},
+    TopUpIncentives { topup_amounts: Vec<Uint128> },
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
