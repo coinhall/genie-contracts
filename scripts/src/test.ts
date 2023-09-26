@@ -302,6 +302,8 @@ async function claim(
   let amounts_string = amounts.map((amt) => amt.toString()).join(",");
   const claim_amounts_string = Buffer.from(amounts_string).toString("base64");
 
+  let lootinfo = amounts.map((amt) => Math.floor(amt / 10)).join(",");
+
   const claim = new MsgExecuteContract(
     wallet.key.accAddress("terra"),
     airdropContract,
@@ -309,6 +311,9 @@ async function claim(
       claim: {
         signature: signature,
         claim_amounts: claim_amounts_string,
+        lootbox_info: {
+          claimed_lootbox: Buffer.from(lootinfo).toString("base64"),
+        },
       },
     },
     {}
@@ -606,7 +611,7 @@ async function topup_test(factoryContract: string) {
     [2000, 5000],
     starttime,
     endtime,
-    "4"
+    "5"
   );
 
   await wait(6000);
