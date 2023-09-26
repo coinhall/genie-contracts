@@ -242,40 +242,6 @@ async function topupIncentives(
     },
   };
   const sendTokens = new MsgExecuteContract(
-    wallet.key.accAddress(prefix),
-    token_contract,
-    astroSend,
-    {}
-  );
-
-  const tx = await wallet.createAndSignTx({
-    msgs: [sendTokens],
-    chainID: chainID,
-  });
-  console.log(tx);
-  console.log("----------------------------------");
-  const res = await terra.tx.broadcast(tx, chainID);
-  console.log(res);
-}
-
-async function topupIncentives(
-  wallet: Wallet,
-  token_contract: string,
-  amount: number[],
-  airdropContract: string
-) {
-  const astroSend = {
-    send: {
-      contract: airdropContract,
-      amount: amount.toString(),
-      msg: Buffer.from(
-        JSON.stringify({
-          topup_incentives: {},
-        })
-      ).toString("base64"),
-    },
-  };
-  const sendTokens = new MsgExecuteContract(
     wallet.key.accAddress("terra"),
     token_contract,
     astroSend,
@@ -639,8 +605,6 @@ async function single_test3(factoryContract: string) {
   Claim    3000, 3000
   End 
   Transfer 5000
-
-
 */
 async function topup_test(factoryContract: string) {
   const starttime = Math.trunc(Date.now() / 1000 + 50);
