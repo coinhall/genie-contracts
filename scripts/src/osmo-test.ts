@@ -12,7 +12,7 @@ import * as path from "path";
 import * as secp256k1 from "secp256k1";
 import keccak256 from "keccak256";
 
-console.log("Example usage: yarn start src/test.ts --m1");
+console.log("Example usage: yarn start src/osmo-test.ts --m1");
 
 const IS_M1 = process.argv[2] === "--m1";
 const M1_MODIFIER = IS_M1 ? "-aarch64" : "";
@@ -55,17 +55,7 @@ if (!PUBLICKEY) {
   process.exit(1);
 }
 
-// const terra = new LCDClient({
-//   "pisco-1": {
-//     lcd: "https://pisco-lcd.terra.dev",
-//     chainID: chainID,
-//     gasAdjustment: 1.75,
-//     gasPrices: { uosmo: 0.015 },
-//     prefix: prefix,
-//   },
-// });
-
-const terra = new LCDClient({
+const client = new LCDClient({
   "osmo-test-5": {
     lcd: "https://lcd.osmotest5.osmosis.zone/",
     chainID: chainID,
@@ -81,21 +71,21 @@ const key = new MnemonicKey({
   account: 0,
   index: 0,
 });
-const hallwallet = terra.wallet(key);
+const hallwallet = client.wallet(key);
 const key2 = new MnemonicKey({
   mnemonic: PROTOCOL_PHRASE,
   coinType: 118,
   account: 0,
   index: 0,
 });
-const protocolWallet = terra.wallet(key2);
+const protocolWallet = client.wallet(key2);
 const key3 = new MnemonicKey({
   mnemonic: USER_PHRASE,
   coinType: 118,
   account: 0,
   index: 0,
 });
-const userWallet = terra.wallet(key3);
+const userWallet = client.wallet(key3);
 
 const factoryFile = fs.readFileSync(
   path.resolve(
@@ -131,7 +121,7 @@ async function uploadContract(wallet: Wallet) {
   });
   console.log(tx);
   console.log("----------------------------------");
-  const res = await terra.tx.broadcast(tx, chainID);
+  const res = await client.tx.broadcast(tx, chainID);
   console.log(res);
   const factoryCode = parseInt(res.logs[0].events[1].attributes[1].value);
   const contractCode = parseInt(res.logs[1].events[1].attributes[1].value);
@@ -159,7 +149,7 @@ async function instantiateFactory(
   });
   console.log(tx);
   console.log("----------------------------------");
-  const res = await terra.tx.broadcast(tx, chainID);
+  const res = await client.tx.broadcast(tx, chainID);
   console.log(res);
   console.log(res.toString());
   const factoryContract = res.logs[0].events[0].attributes[0].value;
@@ -196,7 +186,7 @@ async function createAirdrop(
   });
   console.log(tx);
   console.log("----------------------------------");
-  const res = await terra.tx.broadcast(tx, chainID);
+  const res = await client.tx.broadcast(tx, chainID);
   console.log(res);
   const airdropContract = res.logs[0].events[1].attributes[0].value;
   console.log("airdropContract", airdropContract);
@@ -232,7 +222,7 @@ async function increaseIncentives(
   });
   console.log(tx);
   console.log("----------------------------------");
-  const res = await terra.tx.broadcast(tx, chainID);
+  const res = await client.tx.broadcast(tx, chainID);
   console.log(res);
 }
 
@@ -266,7 +256,7 @@ async function increaseIncentives(
 //   });
 //   console.log(tx);
 //   console.log("----------------------------------");
-//   const res = await terra.tx.broadcast(tx, chainID);
+//   const res = await client.tx.broadcast(tx, chainID);
 //   console.log(res);
 // }
 
@@ -289,7 +279,7 @@ async function increaseOsmoIncentives(
   });
   console.log(tx);
   console.log("----------------------------------");
-  const res = await terra.tx.broadcast(tx, chainID);
+  const res = await client.tx.broadcast(tx, chainID);
   console.log(res);
 }
 async function claim(
@@ -340,7 +330,7 @@ async function claim(
   });
   console.log(tx);
   console.log("----------------------------------");
-  const res = await terra.tx.broadcast(tx, chainID);
+  const res = await client.tx.broadcast(tx, chainID);
   console.log(res);
   return res;
 }
@@ -367,7 +357,7 @@ async function transferUnclaimedTokens(
   });
   console.log(tx);
   console.log("----------------------------------");
-  const res = await terra.tx.broadcast(tx, chainID);
+  const res = await client.tx.broadcast(tx, chainID);
   console.log(res);
   return res;
 }
@@ -404,12 +394,11 @@ const throwErr = (_: any) => {
 
 // query contract
 const queryContract = async (contract: string) => {
-  const res = await terra.wasm.contractQuery(contract, {
+  const res = await client.wasm.contractQuery(contract, {
     config: {},
   });
   console.log(res);
 };
-
 
 testall();
 
