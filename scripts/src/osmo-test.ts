@@ -312,6 +312,14 @@ async function claim(
   let amounts_string = amounts.map((amt) => amt.toString()).join(",");
   const claim_amounts_string = Buffer.from(amounts_string).toString("base64");
 
+  let lootinfo = "";
+  for (let i = 0; i < amounts.length; i++) {
+    lootinfo += Math.floor(amounts[i] / 10).toString();
+    if (i != amounts.length - 1) {
+      lootinfo += ",";
+    }
+  }
+
   const claim = new MsgExecuteContract(
     wallet.key.accAddress(prefix),
     airdropContract,
@@ -319,6 +327,9 @@ async function claim(
       claim: {
         signature: signature,
         claim_amounts: claim_amounts_string,
+        lootbox_info: {
+          claimed_lootbox: Buffer.from(lootinfo).toString("base64"),
+        },
       },
     },
     {}
@@ -390,6 +401,15 @@ const expectError = (message) => (err: Error) => {
 const throwErr = (_: any) => {
   throw new Error("Error not thrown");
 };
+
+// query contract
+const queryContract = async (contract: string) => {
+  const res = await terra.wasm.contractQuery(contract, {
+    config: {},
+  });
+  console.log(res);
+};
+
 
 testall();
 
@@ -479,11 +499,7 @@ async function test1(factoryContract: string) {
   // This should not error anymore
   await claim(userWallet, airdropContract, [3_000, 0, 0]);
   await wait(6000);
-  await claim(
-    protocolWallet,
-    airdropContract,
-    [5_000, 5_000, 5_000]
-  );
+  await claim(protocolWallet, airdropContract, [5_000, 5_000, 5_000]);
   await wait(6000);
   await claim(hallwallet, airdropContract, [10_000, 1_000, 1_000]);
   await wait(6000);
