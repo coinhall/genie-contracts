@@ -418,7 +418,6 @@ pub fn handle_claim(
         claimable_amounts.push(actual_claim_amount);
     }
 
-    USERS.save(deps.storage, recipient, &user_info)?;
     // save the new state
     STATE.save(deps.storage, &state)?;
 
@@ -480,6 +479,8 @@ pub fn handle_claim(
         user_info.claimed_lootbox = Some(lootbox_amounts);
         attributes.push(attr("claimed_lootbox", lootbox_amounts_string))
     }
+
+    USERS.save(deps.storage, recipient, &user_info)?;
 
     Ok(Response::new()
         .add_messages(messages)
