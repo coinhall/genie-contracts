@@ -23,8 +23,12 @@ const USER_PHRASE = process.env.USER_PHRASE;
 const PUBLICKEY = process.env.PUBLICKEY;
 const PRIVATEKEY = process.env.PRIVATEKEY;
 
+const chainID = "pisco-1";
+const prefix = "terra";
+
 const FACTORY_CONTRACT = "genie-airdrop-factory";
 const CONTRACT = "genie-airdrop";
+
 const TOKEN_CONTRACT =
   "terra167dsqkh2alurx997wmycw9ydkyu54gyswe3ygmrs4lwume3vmwks8ruqnv";
 const asset_info = {
@@ -62,10 +66,10 @@ if (!PUBLICKEY) {
 const terra = new LCDClient({
   "pisco-1": {
     lcd: "https://pisco-lcd.terra.dev",
-    chainID: "pisco-1",
+    chainID: chainID,
     gasAdjustment: 1.75,
     gasPrices: { uluna: 0.015 },
-    prefix: "terra",
+    prefix: prefix,
   },
 });
 
@@ -102,21 +106,21 @@ const file = fs.readFileSync(
 );
 async function uploadContract(wallet: Wallet) {
   const uploadFactory = new MsgStoreCode(
-    wallet.key.accAddress("terra"),
+    wallet.key.accAddress(prefix),
     Buffer.from(factoryFile).toString("base64")
   );
   const upload = new MsgStoreCode(
-    wallet.key.accAddress("terra"),
+    wallet.key.accAddress(prefix),
     Buffer.from(file).toString("base64")
   );
 
   const tx = await wallet.createAndSignTx({
     msgs: [uploadFactory, upload],
-    chainID: "pisco-1",
+    chainID: chainID,
   });
   console.log(tx);
   console.log("----------------------------------");
-  const res = await terra.tx.broadcast(tx, "pisco-1");
+  const res = await terra.tx.broadcast(tx, chainID);
   console.log(res);
   const factoryCode = parseInt(res.logs[0].events[1].attributes[1].value);
   const contractCode = parseInt(res.logs[1].events[1].attributes[1].value);
@@ -131,7 +135,7 @@ async function instantiateFactory(
 ) {
   const initMsg = { airdrop_code_id: contractCode, public_key: PUBLICKEY };
   const instantiateFactory = new MsgInstantiateContract(
-    wallet.key.accAddress("terra"),
+    wallet.key.accAddress(prefix),
     undefined,
     factoryCode,
     initMsg,
@@ -140,13 +144,13 @@ async function instantiateFactory(
   );
   const tx = await wallet.createAndSignTx({
     msgs: [instantiateFactory],
-    chainID: "pisco-1",
+    chainID: chainID,
   });
   console.log(tx);
   console.log("----------------------------------");
-  const res = await terra.tx.broadcast(tx, "pisco-1");
+  const res = await terra.tx.broadcast(tx, chainID);
   console.log(res);
-  const factoryContract = res.logs[0].events[0].attributes[0].value;
+  const factoryContract = res.logs[0].events[1].attributes[0].value;
   console.log("factoryContract", factoryContract);
   return factoryContract;
 }
@@ -161,7 +165,7 @@ async function createAirdrop(
   campaign_id: string
 ) {
   const createAirdrop = new MsgExecuteContract(
-    wallet.key.accAddress("terra"),
+    wallet.key.accAddress(prefix),
     factoryContract,
     {
       create_airdrop: {
@@ -176,11 +180,11 @@ async function createAirdrop(
   );
   const tx = await wallet.createAndSignTx({
     msgs: [createAirdrop],
-    chainID: "pisco-1",
+    chainID: chainID,
   });
   console.log(tx);
   console.log("----------------------------------");
-  const res = await terra.tx.broadcast(tx, "pisco-1");
+  const res = await terra.tx.broadcast(tx, chainID);
   console.log(res);
   const airdropContract = res.logs[0].events[1].attributes[0].value;
   console.log("airdropContract", airdropContract);
@@ -204,7 +208,7 @@ async function increaseIncentives(
     },
   };
   const sendTokens = new MsgExecuteContract(
-    wallet.key.accAddress("terra"),
+    wallet.key.accAddress(prefix),
     token_contract,
     astroSend,
     {}
@@ -212,11 +216,45 @@ async function increaseIncentives(
 
   const tx = await wallet.createAndSignTx({
     msgs: [sendTokens],
-    chainID: "pisco-1",
+    chainID: chainID,
   });
   console.log(tx);
   console.log("----------------------------------");
-  const res = await terra.tx.broadcast(tx, "pisco-1");
+  const res = await terra.tx.broadcast(tx, chainID);
+  console.log(res);
+}
+
+async function topupIncentives(
+  wallet: Wallet,
+  token_contract: string,
+  amount: number[],
+  airdropContract: string
+) {
+  const astroSend = {
+    send: {
+      contract: airdropContract,
+      amount: amount.toString(),
+      msg: Buffer.from(
+        JSON.stringify({
+          topup_incentives: {},
+        })
+      ).toString("base64"),
+    },
+  };
+  const sendTokens = new MsgExecuteContract(
+    wallet.key.accAddress(prefix),
+    token_contract,
+    astroSend,
+    {}
+  );
+
+  const tx = await wallet.createAndSignTx({
+    msgs: [sendTokens],
+    chainID: chainID,
+  });
+  console.log(tx);
+  console.log("----------------------------------");
+  const res = await terra.tx.broadcast(tx, chainID);
   console.log(res);
 }
 
@@ -260,7 +298,7 @@ async function increaseLunaIncentives(
   amount: number
 ) {
   const increaseIncentives = new MsgExecuteContract(
-    wallet.key.accAddress("terra"),
+    wallet.key.accAddress(prefix),
     airdropContract,
     {
       increase_incentives: {},
@@ -269,11 +307,11 @@ async function increaseLunaIncentives(
   );
   const tx = await wallet.createAndSignTx({
     msgs: [increaseIncentives],
-    chainID: "pisco-1",
+    chainID: chainID,
   });
   console.log(tx);
   console.log("----------------------------------");
-  const res = await terra.tx.broadcast(tx, "pisco-1");
+  const res = await terra.tx.broadcast(tx, chainID);
   console.log(res);
 }
 async function claim(
@@ -282,7 +320,7 @@ async function claim(
   amounts: number[]
 ) {
   const private_key = Buffer.from(PRIVATEKEY ?? "", "base64");
-  const account = wallet.key.accAddress("terra");
+  const account = wallet.key.accAddress(prefix);
   const claimsContract = airdropContract;
   const amountstr = amounts
     .map((x) => x.toLocaleString("fullwide", { useGrouping: false }))
@@ -309,11 +347,11 @@ async function claim(
   );
   const tx = await wallet.createAndSignTx({
     msgs: [claim],
-    chainID: "pisco-1",
+    chainID: chainID,
   });
   console.log(tx);
   console.log("----------------------------------");
-  const res = await terra.tx.broadcast(tx, "pisco-1");
+  const res = await terra.tx.broadcast(tx, chainID);
   console.log(res);
   return res;
 }
@@ -336,11 +374,11 @@ async function transferUnclaimedTokens(
   );
   const tx = await wallet.createAndSignTx({
     msgs: [transferUnclaimed],
-    chainID: "pisco-1",
+    chainID: chainID,
   });
   console.log(tx);
   console.log("----------------------------------");
-  const res = await terra.tx.broadcast(tx, "pisco-1");
+  const res = await terra.tx.broadcast(tx, chainID);
   console.log(res);
   return res;
 }
@@ -386,6 +424,9 @@ async function testall() {
   });
   await wait(6000);
 
+  // const factoryContract =
+  //   "terra1ydwlh3auwwhn7xl4fn5zaeqx7xktmd9kqp0la4da3zxd7t6frjws2j50st";
+
   console.log("TESTING MULTI TEST 1");
   await test1(factoryContract).catch((err) => {
     console.log(err);
@@ -397,7 +438,17 @@ async function testall() {
   //   console.log(err);
   // });
   // await wait(6000);
+  // console.log("TESTING SINGLE TEST 1");
+  // await single_test1(factoryContract).catch((err) => {
+  //   console.log(err);
+  // });
+  // await wait(6000);
 
+  // console.log("TESTING SINGLE TEST 2");
+  // await single_test2(factoryContract).catch((err) => {
+  //   console.log(err);
+  // });
+  // await wait(6000);
   // console.log("TESTING SINGLE TEST 2");
   // await single_test2(factoryContract).catch((err) => {
   //   console.log(err);
@@ -425,10 +476,10 @@ Test scenario for multi mission contract
 - [ ]  User1 claims [3,0,0] astro (Receives 1 astro)
 - [ ]  User1 claims [1,0,0] astro (fail)
 - [ ]  User1 claims [1,0,3] astro (fail)
-- [ ]  User1 claims [3,0,0] astro (fail)
+- [ ]  User1 claims [3,0,0] astro (no fail)
 - [ ]  User2 claims [5,5,5] astro
 - [ ]  User3 claims [10,1,1] astro (Receives 2 + 1 + 1 astro)
-- [ ]  User1 claims [4,0,0] astro (fail, nothing left to claim)
+- [ ]  User1 claims [4,0,0] astro (nofail, nothing left to claim)
 - [ ]  User1 claims [4,0,1] astro (Receives 1 astro from mission 3)
 50 - 10 - 6 - 7 = 27
 */
@@ -478,8 +529,6 @@ async function test1(factoryContract: string) {
   await claim(hallwallet, airdropContract, [10_000_000, 1_000_000, 1_000_000]);
   await wait(6000);
   await claim(userWallet, airdropContract, [4_000_000, 0, 0]);
-  // .then(throwErr)
-  // .catch(expectError("Error is thrown for being unable to claim"));
   await wait(6000);
   await claim(userWallet, airdropContract, [4_000_000, 0, 1_000_000]);
   await waitUntil(endtime);
@@ -526,8 +575,6 @@ async function single_test1(factoryContract: string) {
   await claim(protocolWallet, airdropContract, [4000000]);
   await wait(6000);
   await claim(hallwallet, airdropContract, [1000000]);
-  // .then(throwErr)
-  // .catch(expectError("Error is thrown for being unable to claim"));
   await wait(6000);
   return airdropContract;
 }
