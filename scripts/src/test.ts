@@ -186,7 +186,7 @@ async function createAirdrop(
   console.log("----------------------------------");
   const res = await terra.tx.broadcast(tx, chainID);
   console.log(res);
-  const airdropContract = res.logs[0].events[1].attributes[0].value;
+  const airdropContract = res.logs[0].events[3].attributes[0].value;
   console.log("airdropContract", airdropContract);
   return airdropContract;
 }
@@ -233,10 +233,12 @@ async function topupIncentives(
   const astroSend = {
     send: {
       contract: airdropContract,
-      amount: amount.toString(),
+      amount: amount.reduce((a, b) => a + b, 0).toString(),
       msg: Buffer.from(
         JSON.stringify({
-          topup_incentives: {},
+          top_up_incentives: {
+            topup_amounts: amount.map((x) => x.toString()),
+          },
         })
       ).toString("base64"),
     },
@@ -390,14 +392,11 @@ async function testall() {
   });
   await wait(6000);
 
-  // const factoryContract =
-  //   "terra1ydwlh3auwwhn7xl4fn5zaeqx7xktmd9kqp0la4da3zxd7t6frjws2j50st";
-
-  console.log("TESTING MULTI TEST 1");
-  await test1(factoryContract).catch((err) => {
-    console.log(err);
-  });
-  await wait(6000);
+  // console.log("TESTING MULTI TEST 1");
+  // await test1(factoryContract).catch((err) => {
+  //   console.log(err);
+  // });
+  // await wait(6000);
 
   // console.log("TESTING SINGLE TEST 1");
   // await single_test1(factoryContract).catch((err) => {
@@ -427,11 +426,11 @@ async function testall() {
   // });
   // await wait(6000);
 
-  // console.log("TESTING TOPUP TEST");
-  // await topup_test(factoryContract).catch((err) => {
-  //   console.log(err);
-  // });
-  // await wait(6000);
+  console.log("TESTING TOPUP TEST");
+  await topup_test(factoryContract).catch((err) => {
+    console.log(err);
+  });
+  await wait(6000);
 
   console.log("DONE TESTING");
 }
@@ -608,13 +607,13 @@ async function single_test3(factoryContract: string) {
 */
 async function topup_test(factoryContract: string) {
   const starttime = Math.trunc(Date.now() / 1000 + 50);
-  const endtime = Math.trunc(Date.now() / 1000 + 150);
+  const endtime = Math.trunc(Date.now() / 1000 + 250);
 
   const airdropContract = await createAirdrop(
     protocolWallet,
     factoryContract,
     asset_info,
-    [10_000_000, 20_000_000, 20_000_000],
+    [2000, 5000],
     starttime,
     endtime,
     "4"

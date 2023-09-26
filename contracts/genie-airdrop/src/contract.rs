@@ -193,7 +193,6 @@ pub fn handle_topup_cw20_incentives(
     }
 
     state.protocol_funding += amount;
-    STATE.save(deps.storage, &state)?;
 
     config.allocated_amount += amount;
     CONFIG.save(deps.storage, &config)?;
@@ -202,10 +201,30 @@ pub fn handle_topup_cw20_incentives(
         state.unclaimed_amounts[i] = state.unclaimed_amounts[i].checked_add(*topup_amount)?;
     }
 
+    STATE.save(deps.storage, &state)?;
+
     Ok(Response::new().add_attributes(vec![
         attr("action", "genie_increase_rewards"),
         attr("asset", asset),
         attr("protocol_funding", state.protocol_funding),
+        attr("increase_amount", amount),
+        attr(
+            "topup_amounts",
+            topup_amounts
+                .iter()
+                .map(|x| x.to_string())
+                .collect::<Vec<String>>()
+                .join(","),
+        ),
+        attr(
+            "unclaimed_amounts",
+            state
+                .unclaimed_amounts
+                .iter()
+                .map(|x| x.to_string())
+                .collect::<Vec<String>>()
+                .join(","),
+        ),
     ]))
 }
 
@@ -299,7 +318,6 @@ pub fn handle_topup_native_incentives(
     }
 
     state.protocol_funding += increase_amount;
-    STATE.save(deps.storage, &state)?;
 
     let mut config = CONFIG.load(deps.storage)?;
     config.allocated_amount += increase_amount;
@@ -309,10 +327,30 @@ pub fn handle_topup_native_incentives(
         state.unclaimed_amounts[i] = state.unclaimed_amounts[i].checked_add(*topup_amount)?;
     }
 
+    STATE.save(deps.storage, &state)?;
+
     Ok(Response::new().add_attributes(vec![
         attr("action", "genie_increase_rewards"),
         attr("asset", config.asset.asset_string()),
         attr("protocol_funding", state.protocol_funding),
+        attr("increase_amount", increase_amount),
+        attr(
+            "topup_amounts",
+            topup_amounts
+                .iter()
+                .map(|x| x.to_string())
+                .collect::<Vec<String>>()
+                .join(","),
+        ),
+        attr(
+            "unclaimed_amounts",
+            state
+                .unclaimed_amounts
+                .iter()
+                .map(|x| x.to_string())
+                .collect::<Vec<String>>()
+                .join(","),
+        ),
     ]))
 }
 
