@@ -397,29 +397,29 @@ async function testall() {
   });
   await wait(6000);
 
-  // console.log("TESTING MULTI TEST 1");
-  // await test1(factoryContract).catch((err) => {
-  //   console.log(err);
-  // });
-  // await wait(6000);
+  console.log("TESTING MULTI TEST 1");
+  await test1(factoryContract).catch((err) => {
+    console.log(err);
+  });
+  await wait(6000);
 
-  // console.log("TESTING SINGLE TEST 1");
-  // await single_test1(factoryContract).catch((err) => {
-  //   console.log(err);
-  // });
-  // await wait(6000);
+  console.log("TESTING SINGLE TEST 1");
+  await single_test1(factoryContract).catch((err) => {
+    console.log(err);
+  });
+  await wait(6000);
 
-  // console.log("TESTING SINGLE TEST 2");
-  // await single_test2(factoryContract).catch((err) => {
-  //   console.log(err);
-  // });
-  // await wait(6000);
+  console.log("TESTING SINGLE TEST 2");
+  await single_test2(factoryContract).catch((err) => {
+    console.log(err);
+  });
+  await wait(6000);
 
-  // console.log("TESTING SINGLE TEST 3");
-  // await single_test3(factoryContract).catch((err) => {
-  //   console.log(err);
-  // });
-  // await wait(6000);
+  console.log("TESTING SINGLE TEST 3");
+  await single_test3(factoryContract).catch((err) => {
+    console.log(err);
+  });
+  await wait(6000);
 
   console.log("TESTING TOPUP TEST");
   await topup_test(factoryContract).catch((err) => {
