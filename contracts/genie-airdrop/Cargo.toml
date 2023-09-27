@@ -1,6 +1,6 @@
 [package]
 name = "genie-airdrop"
-version = "0.1.0"
+version = "0.1.1"
 authors = ["Coinhall"]
 edition = "2018"
 
@@ -34,7 +34,7 @@ optimize-m1 = """docker run --rm -v "$(pwd)":/code \
 """
 
 [dependencies]
-genie = { path = "../../packages/genie", default-features = false, version = "0.1.0" }
+genie = { path = "../../packages/genie", default-features = false, version = "0.1.1" }
 cosmwasm-std = "1.0.0"
 cw-storage-plus = "1.1.0"
 cw2 = "0.13.4"
