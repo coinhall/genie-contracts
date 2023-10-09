@@ -332,7 +332,8 @@ pub fn handle_transfer_unclaimed_tokens(
         return Err(StdError::generic_err("can only be called by owner"));
     }
     // Can only withdraw if campaign is not ongoing
-    if query_status(deps.as_ref(), &env)?.status == Status::Ongoing {
+    let status = query_status(deps.as_ref(), &env)?.status;
+    if status == Status::Ongoing {
         return Err(StdError::generic_err(
             "cannot withdraw while campaign is ongoing",
         ));
@@ -343,11 +344,14 @@ pub fn handle_transfer_unclaimed_tokens(
     let amount = query_balance(&deps.as_ref().querier, &env.contract.address, &config.asset)?;
     let mut state = STATE.load(deps.storage)?;
     state.protocol_funding = Uint128::zero();
-    state.unclaimed_amounts = state
-        .unclaimed_amounts
-        .iter()
-        .map(|_| Uint128::zero())
-        .collect();
+    // Do not reset unclaimed_amounts if campaign has not started
+    if status != Status::NotStarted {
+        state.unclaimed_amounts = state
+            .unclaimed_amounts
+            .iter()
+            .map(|_| Uint128::zero())
+            .collect();
+    }
     STATE.save(deps.storage, &state)?;
 
     // Transfer assets to recipient
