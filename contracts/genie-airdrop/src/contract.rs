@@ -7,7 +7,7 @@ use cosmwasm_std::{
 use cw2::set_contract_version;
 use cw20::Cw20ReceiveMsg;
 use genie::airdrop::{
-    ClaimResponse, Cw20HookMsg, ExecuteMsg, InstantiateMsg, LootboxInfo, QueryMsg, Status,
+    ClaimPayload, ClaimResponse, Cw20HookMsg, ExecuteMsg, InstantiateMsg, QueryMsg, Status,
     StatusResponse, UserInfoResponse, UserLootboxInfoResponse,
 };
 use genie::asset::{build_transfer_asset_msg, query_balance, AssetInfo};
@@ -71,13 +71,9 @@ pub fn execute(
     match msg {
         ExecuteMsg::Receive(msg) => receive_cw20(deps, env, info, msg),
         ExecuteMsg::IncreaseIncentives {} => handle_increase_native_incentives(deps, env, info),
-        ExecuteMsg::Claim {
-            claim_amounts,
-            signature,
-            lootbox_info,
-        } => handle_claim(deps, env, info, claim_amounts, signature, lootbox_info),
-        ExecuteMsg::TransferUnclaimedTokens { recipient, amount } => {
-            handle_transfer_unclaimed_tokens(deps, env, info, recipient, amount)
+        ExecuteMsg::Claim { payload } => handle_claim(deps, env, info, payload),
+        ExecuteMsg::TransferUnclaimedTokens { recipient } => {
+            handle_transfer_unclaimed_tokens(deps, env, info, recipient)
         }
     }
 }
@@ -199,20 +195,16 @@ pub fn handle_claim(
     deps: DepsMut,
     env: Env,
     info: MessageInfo,
-    claim_amounts: Binary,
-    signature: Binary,
-    lootbox_info: Option<LootboxInfo>,
+    payload: Binary,
 ) -> Result<Response, StdError> {
+    let ClaimPayload {
+        claim_amounts,
+        signature,
+        lootbox_info,
+    } = from_binary(&payload)?;
     if query_status(deps.as_ref(), &env)?.status != Status::Ongoing {
         return Err(StdError::generic_err("campaign is not ongoing"));
     }
-
-    // convert claim_amounts to string
-    let claim_string = String::from_utf8(claim_amounts.to_vec())?;
-    let claim_amounts = claim_string
-        .split(',')
-        .map(|x| x.parse::<Uint128>())
-        .collect::<Result<Vec<Uint128>, _>>()?;
 
     let recipient = &info.sender;
     let mut user_info = USERS.load(deps.storage, recipient).unwrap_or_default();
@@ -303,21 +295,19 @@ pub fn handle_claim(
     // Lootbox specific logic
     // Convert lootbox_amounts to string
     if let Some(lootbox_info) = lootbox_info {
-        let lootbox_amounts_binary = lootbox_info.claimed_lootbox;
-        let lootbox_amounts_string = String::from_utf8(lootbox_amounts_binary.to_vec())?;
-        let lootbox_amounts = lootbox_amounts_string
-            .split(',')
-            .map(|x| x.parse::<Uint128>())
-            .collect::<Result<Vec<Uint128>, _>>()?;
-
         // Vec length must coincide with mission length
-        if lootbox_amounts.len() != claim_amounts.len() {
+        if lootbox_info.len() != claim_amounts.len() {
             return Err(StdError::generic_err(
                 "lootbox amounts length does not match claimable amount length",
             ));
         }
+        let lootbox_amounts_string = lootbox_info
+            .iter()
+            .map(|x| x.to_string())
+            .collect::<Vec<String>>()
+            .join(",");
 
-        user_info.claimed_lootbox = Some(lootbox_amounts);
+        user_info.claimed_lootbox = Some(lootbox_info);
         attributes.push(attr("claimed_lootbox", lootbox_amounts_string))
     }
 
@@ -333,7 +323,6 @@ pub fn handle_transfer_unclaimed_tokens(
     env: Env,
     info: MessageInfo,
     recipient: String,
-    amount: Uint128,
 ) -> Result<Response, StdError> {
     let recipient = deps.api.addr_validate(&recipient)?;
     let config = CONFIG.load(deps.storage)?;
@@ -349,17 +338,16 @@ pub fn handle_transfer_unclaimed_tokens(
         ));
     }
 
-    // Allow transfers of remaining tokens if there are less tokens than the requested amount
     // Balance in this contract must be queried to handle the case where assets was deposited
     // without using the `increase_incentives` execute msg.
-    let max_transferable_amount =
-        query_balance(&deps.as_ref().querier, &env.contract.address, &config.asset)?;
-    let amount = max_transferable_amount.min(amount);
+    let amount = query_balance(&deps.as_ref().querier, &env.contract.address, &config.asset)?;
     let mut state = STATE.load(deps.storage)?;
-    state.protocol_funding = state
-        .protocol_funding
-        .checked_sub(amount)
-        .unwrap_or(Uint128::zero());
+    state.protocol_funding = Uint128::zero();
+    state.unclaimed_amounts = state
+        .unclaimed_amounts
+        .iter()
+        .map(|_| Uint128::zero())
+        .collect();
     STATE.save(deps.storage, &state)?;
 
     // Transfer assets to recipient
