@@ -18,19 +18,10 @@ pub struct InstantiateMsg {
 #[serde(rename_all = "snake_case")]
 pub enum ExecuteMsg {
     Receive(Cw20ReceiveMsg),
-    Claim {
-        claim_amounts: Binary,
-        signature: Binary,
-        lootbox_info: Option<LootboxInfo>,
-    },
+    Claim { payload: Binary },
     IncreaseIncentives {},
-    TransferUnclaimedTokens {
-        recipient: String,
-        amount: Uint128,
-    },
-    TopUpIncentives {
-        topup_amounts: Vec<Uint128>,
-    },
+    TransferUnclaimedTokens { recipient: String },
+    TopUpIncentives { topup_amounts: Vec<Uint128> },
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
@@ -38,6 +29,14 @@ pub enum ExecuteMsg {
 pub enum Cw20HookMsg {
     IncreaseIncentives {},
     TopUpIncentives { topup_amounts: Vec<Uint128> },
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub struct ClaimPayload {
+    pub claim_amounts: Vec<Uint128>,
+    pub signature: Binary,
+    pub lootbox_info: Option<Vec<Uint128>>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
@@ -77,6 +76,16 @@ pub enum Status {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct StatusResponse {
     pub status: Status,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+pub struct StateResponse {
+    /// Unclaimed amount, per mission, currently in this contract
+    pub unclaimed_amounts: Vec<Uint128>,
+    /// Total funds protocol has sent and removed to this contract via `increase_incentives` and `transfer_unclaimed_tokens`
+    pub protocol_funding: Uint128,
+    /// Actual amount of tokens in this contract
+    pub current_balance: Uint128,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
