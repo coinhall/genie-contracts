@@ -83,7 +83,7 @@ pub struct StateResponse {
     /// Total funds protocol has sent and removed to this contract via `increase_incentives` and `transfer_unclaimed_tokens`
     pub protocol_funding: Uint128,
     /// Actual amount of tokens in this contract
-    pub current_amount: Uint128,
+    pub current_balance: Uint128,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]

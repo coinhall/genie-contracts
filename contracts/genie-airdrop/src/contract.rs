@@ -370,12 +370,12 @@ pub fn handle_transfer_unclaimed_tokens(
 fn query_state(deps: Deps, env: Env) -> StdResult<StateResponse> {
     let state = STATE.load(deps.storage)?;
     let asset = CONFIG.load(deps.storage)?.asset;
-    let current_amount = query_balance(&deps.querier, &env.contract.address, &asset)?;
+    let current_balance = query_balance(&deps.querier, &env.contract.address, &asset)?;
 
     Ok(StateResponse {
         unclaimed_amounts: state.unclaimed_amounts,
         protocol_funding: state.protocol_funding,
-        current_amount,
+        current_balance,
     })
 }
 
