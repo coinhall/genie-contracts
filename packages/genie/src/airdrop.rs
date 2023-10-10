@@ -77,6 +77,16 @@ pub struct StatusResponse {
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+pub struct StateResponse {
+    /// Unclaimed amount, per mission, currently in this contract
+    pub unclaimed_amounts: Vec<Uint128>,
+    /// Total funds protocol has sent and removed to this contract via `increase_incentives` and `transfer_unclaimed_tokens`
+    pub protocol_funding: Uint128,
+    /// Actual amount of tokens in this contract
+    pub current_amount: Uint128,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct LootboxInfo {
     pub claimed_lootbox: Binary,
 }

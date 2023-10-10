@@ -7,8 +7,8 @@ use cosmwasm_std::{
 use cw2::set_contract_version;
 use cw20::Cw20ReceiveMsg;
 use genie::airdrop::{
-    ClaimPayload, ClaimResponse, Cw20HookMsg, ExecuteMsg, InstantiateMsg, QueryMsg, Status,
-    StatusResponse, UserInfoResponse, UserLootboxInfoResponse,
+    ClaimPayload, ClaimResponse, Cw20HookMsg, ExecuteMsg, InstantiateMsg, QueryMsg, StateResponse,
+    Status, StatusResponse, UserInfoResponse, UserLootboxInfoResponse,
 };
 use genie::asset::{build_transfer_asset_msg, query_balance, AssetInfo};
 
@@ -82,7 +82,7 @@ pub fn execute(
 pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
         QueryMsg::Config {} => to_binary(&CONFIG.load(deps.storage)?),
-        QueryMsg::State {} => to_binary(&STATE.load(deps.storage)?),
+        QueryMsg::State {} => to_binary(&query_state(deps, env)?),
         QueryMsg::HasUserClaimed { address } => to_binary(&query_has_user_claimed(deps, address)?),
         QueryMsg::UserInfo { address } => to_binary(&query_user_info(deps, address)?),
         QueryMsg::Status {} => to_binary(&query_status(deps, &env)?),
@@ -365,6 +365,18 @@ pub fn handle_transfer_unclaimed_tokens(
             attr("asset", config.asset.asset_string()),
             attr("amount", amount),
         ]))
+}
+
+fn query_state(deps: Deps, env: Env) -> StdResult<StateResponse> {
+    let state = STATE.load(deps.storage)?;
+    let asset = CONFIG.load(deps.storage)?.asset;
+    let current_amount = query_balance(&deps.querier, &env.contract.address, &asset)?;
+
+    Ok(StateResponse {
+        unclaimed_amounts: state.unclaimed_amounts,
+        protocol_funding: state.protocol_funding,
+        current_amount,
+    })
 }
 
 fn query_user_info(deps: Deps, user_address: String) -> StdResult<UserInfoResponse> {
