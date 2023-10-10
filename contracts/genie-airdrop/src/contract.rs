@@ -92,9 +92,6 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> StdResult<Binary> {
         QueryMsg::UserLootboxInfo { address } => {
             to_binary(&query_user_lootbox_data(deps, address)?)
         }
-        QueryMsg::UserLootboxInfo { address } => {
-            to_binary(&query_user_lootbox_data(deps, address)?)
-        }
     }
 }
 
