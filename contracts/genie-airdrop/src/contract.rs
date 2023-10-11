@@ -343,15 +343,11 @@ pub fn handle_transfer_unclaimed_tokens(
     // without using the `increase_incentives` execute msg.
     let amount = query_balance(&deps.as_ref().querier, &env.contract.address, &config.asset)?;
     let mut state = STATE.load(deps.storage)?;
-    state.protocol_funding = Uint128::zero();
-    // Do not reset unclaimed_amounts if campaign has not started
-    if status != Status::NotStarted {
-        state.unclaimed_amounts = state
-            .unclaimed_amounts
-            .iter()
-            .map(|_| Uint128::zero())
-            .collect();
-    }
+    state.protocol_funding = state
+        .protocol_funding
+        .checked_sub(amount)
+        .unwrap_or(Uint128::zero());
+
     STATE.save(deps.storage, &state)?;
 
     // Transfer assets to recipient
