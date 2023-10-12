@@ -1,8 +1,8 @@
 use crate::crypto::is_valid_signature;
-use crate::state::{Config, State, CONFIG, STATE, USERS};
+use crate::state::{Config, LastClaimerInfo, State, CONFIG, LAST_CLAIMER, STATE, USERS};
 use cosmwasm_std::{
-    attr, entry_point, from_binary, to_binary, Binary, Deps, DepsMut, Env, MessageInfo, Response,
-    StdError, StdResult, Uint128,
+    attr, entry_point, from_binary, to_binary, Binary, CosmosMsg, Deps, DepsMut, Env, MessageInfo,
+    Response, StdError, StdResult, Uint128,
 };
 use cw2::set_contract_version;
 use cw20::Cw20ReceiveMsg;
@@ -193,35 +193,49 @@ pub fn handle_topup_cw20_incentives(
     config.allocated_amount += amount;
     CONFIG.save(deps.storage, &config)?;
 
+    let mut msgs: Vec<CosmosMsg> = vec![];
+
+    // TODO LAST CLAIMER checks
     for (i, topup_amount) in topup_amounts.iter().enumerate() {
+        if !topup_amount.is_zero() {
+            if let Ok(last_claimer) = LAST_CLAIMER.load(deps.storage, i as u128) {
+                msgs.push(build_transfer_asset_msg(
+                    &last_claimer.user_address,
+                    &config.asset,
+                    last_claimer.pending_amount,
+                )?);
+            }
+        }
         state.unclaimed_amounts[i] = state.unclaimed_amounts[i].checked_add(*topup_amount)?;
     }
 
     STATE.save(deps.storage, &state)?;
 
-    Ok(Response::new().add_attributes(vec![
-        attr("action", "genie_increase_rewards"),
-        attr("asset", asset),
-        attr("protocol_funding", state.protocol_funding),
-        attr("increase_amount", amount),
-        attr(
-            "topup_amounts",
-            topup_amounts
-                .iter()
-                .map(|x| x.to_string())
-                .collect::<Vec<String>>()
-                .join(","),
-        ),
-        attr(
-            "unclaimed_amounts",
-            state
-                .unclaimed_amounts
-                .iter()
-                .map(|x| x.to_string())
-                .collect::<Vec<String>>()
-                .join(","),
-        ),
-    ]))
+    Ok(Response::new()
+        .add_attributes(vec![
+            attr("action", "genie_increase_rewards"),
+            attr("asset", asset),
+            attr("protocol_funding", state.protocol_funding),
+            attr("increase_amount", amount),
+            attr(
+                "topup_amounts",
+                topup_amounts
+                    .iter()
+                    .map(|x| x.to_string())
+                    .collect::<Vec<String>>()
+                    .join(","),
+            ),
+            attr(
+                "unclaimed_amounts",
+                state
+                    .unclaimed_amounts
+                    .iter()
+                    .map(|x| x.to_string())
+                    .collect::<Vec<String>>()
+                    .join(","),
+            ),
+        ])
+        .add_messages(msgs))
 }
 
 pub fn handle_increase_native_incentives(
@@ -319,35 +333,48 @@ pub fn handle_topup_native_incentives(
     config.allocated_amount += increase_amount;
     CONFIG.save(deps.storage, &config)?;
 
+    let mut msgs: Vec<CosmosMsg> = vec![];
+
+    // TODO LAST CLAIMER checks
     for (i, topup_amount) in topup_amounts.iter().enumerate() {
+        if !topup_amount.is_zero() {
+            if let Ok(last_claimer) = LAST_CLAIMER.load(deps.storage, i as u128) {
+                msgs.push(build_transfer_asset_msg(
+                    &last_claimer.user_address,
+                    &config.asset,
+                    last_claimer.pending_amount,
+                )?);
+            }
+        }
         state.unclaimed_amounts[i] = state.unclaimed_amounts[i].checked_add(*topup_amount)?;
     }
-
     STATE.save(deps.storage, &state)?;
 
-    Ok(Response::new().add_attributes(vec![
-        attr("action", "genie_increase_rewards"),
-        attr("asset", config.asset.asset_string()),
-        attr("protocol_funding", state.protocol_funding),
-        attr("increase_amount", increase_amount),
-        attr(
-            "topup_amounts",
-            topup_amounts
-                .iter()
-                .map(|x| x.to_string())
-                .collect::<Vec<String>>()
-                .join(","),
-        ),
-        attr(
-            "unclaimed_amounts",
-            state
-                .unclaimed_amounts
-                .iter()
-                .map(|x| x.to_string())
-                .collect::<Vec<String>>()
-                .join(","),
-        ),
-    ]))
+    Ok(Response::new()
+        .add_attributes(vec![
+            attr("action", "genie_increase_rewards"),
+            attr("asset", config.asset.asset_string()),
+            attr("protocol_funding", state.protocol_funding),
+            attr("increase_amount", increase_amount),
+            attr(
+                "topup_amounts",
+                topup_amounts
+                    .iter()
+                    .map(|x| x.to_string())
+                    .collect::<Vec<String>>()
+                    .join(","),
+            ),
+            attr(
+                "unclaimed_amounts",
+                state
+                    .unclaimed_amounts
+                    .iter()
+                    .map(|x| x.to_string())
+                    .collect::<Vec<String>>()
+                    .join(","),
+            ),
+        ])
+        .add_messages(msgs))
 }
 
 pub fn handle_claim(
@@ -375,7 +402,6 @@ pub fn handle_claim(
         ));
     }
 
-    // Check if claim_amounts signature is valid
     // Check if claim_amounts signature is valid
     let is_valid = is_valid_signature(
         &deps,
@@ -405,7 +431,21 @@ pub fn handle_claim(
         }
         let difference = amount.checked_sub(user_info.claimed_amounts[i])?;
         let actual_claim_amount = state.unclaimed_amounts[i].min(difference);
+
         state.unclaimed_amounts[i] = state.unclaimed_amounts[i].checked_sub(actual_claim_amount)?;
+
+        // check for last claimer eligibility
+        if state.unclaimed_amounts[i] == Uint128::zero() && difference > actual_claim_amount {
+            // TODO activate last claimer
+            LAST_CLAIMER.save(
+                deps.storage,
+                i as u128,
+                &LastClaimerInfo {
+                    user_address: recipient.clone(),
+                    pending_amount: difference.checked_sub(actual_claim_amount)?,
+                },
+            )?;
+        }
         user_info.claimed_amounts[i] =
             user_info.claimed_amounts[i].checked_add(actual_claim_amount)?;
         claimable_amounts.push(actual_claim_amount);
@@ -503,15 +543,12 @@ pub fn handle_transfer_unclaimed_tokens(
     // without using the `increase_incentives` execute msg.
     let amount = query_balance(&deps.as_ref().querier, &env.contract.address, &config.asset)?;
     let mut state = STATE.load(deps.storage)?;
-    state.protocol_funding = Uint128::zero();
-    // Do not reset unclaimed_amounts if campaign has not started
-    if status != Status::NotStarted {
-        state.unclaimed_amounts = state
-            .unclaimed_amounts
-            .iter()
-            .map(|_| Uint128::zero())
-            .collect();
-    }
+
+    // Makesure it doesn't panic so that we can return the funds to the owner
+    state.protocol_funding = state
+        .protocol_funding
+        .checked_sub(amount)
+        .unwrap_or(Uint128::zero());
     STATE.save(deps.storage, &state)?;
 
     // Transfer assets to recipient

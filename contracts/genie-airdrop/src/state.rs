@@ -35,10 +35,19 @@ pub struct State {
 pub struct UserInfo {
     /// Assets claimed, per mission, by this account
     pub claimed_amounts: Vec<Uint128>,
-    /// If applicable to this campaign, lootboxes claimed, per mission, by this account 
+    /// If applicable to this campaign, lootboxes claimed, per mission, by this account
     pub claimed_lootbox: Option<Vec<Uint128>>,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+pub struct LastClaimerInfo {
+    /// Assets claimed, per mission, by this account
+    pub user_address: Addr,
+    /// If applicable to this campaign, lootboxes claimed, per mission, by this account
+    pub pending_amount: Uint128,
 }
 
 pub const CONFIG: Item<Config> = Item::new("config");
 pub const STATE: Item<State> = Item::new("state");
 pub const USERS: Map<&Addr, UserInfo> = Map::new("users");
+pub const LAST_CLAIMER: Map<u128, LastClaimerInfo> = Map::new("last_claimer");
