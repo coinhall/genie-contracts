@@ -543,12 +543,11 @@ pub fn handle_transfer_unclaimed_tokens(
     // without using the `increase_incentives` execute msg.
     let amount = query_balance(&deps.as_ref().querier, &env.contract.address, &config.asset)?;
     let mut state = STATE.load(deps.storage)?;
-
-    // Makesure it doesn't panic so that we can return the funds to the owner
     state.protocol_funding = state
         .protocol_funding
         .checked_sub(amount)
         .unwrap_or(Uint128::zero());
+
     STATE.save(deps.storage, &state)?;
 
     // Transfer assets to recipient
