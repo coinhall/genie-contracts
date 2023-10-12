@@ -1,8 +1,8 @@
 use crate::crypto::is_valid_signature;
 use crate::state::{Config, LastClaimerInfo, State, CONFIG, LAST_CLAIMER, STATE, USERS};
 use cosmwasm_std::{
-    attr, entry_point, from_binary, to_binary, Binary, CosmosMsg, Deps, DepsMut, Env, MessageInfo,
-    Response, StdError, StdResult, Uint128,
+    attr, entry_point, from_binary, to_binary, Attribute, Binary, CosmosMsg, Deps, DepsMut, Env,
+    MessageInfo, Response, StdError, StdResult, Uint128,
 };
 use cw2::set_contract_version;
 use cw20::Cw20ReceiveMsg;
@@ -194,19 +194,47 @@ pub fn handle_topup_cw20_incentives(
     CONFIG.save(deps.storage, &config)?;
 
     let mut msgs: Vec<CosmosMsg> = vec![];
+    let mut attributes: Vec<Attribute> = vec![];
 
     // TODO LAST CLAIMER checks
     for (i, topup_amount) in topup_amounts.iter().enumerate() {
+        state.unclaimed_amounts[i] = state.unclaimed_amounts[i].checked_add(*topup_amount)?;
+
+        // Check for last claimer activity
         if !topup_amount.is_zero() {
             if let Ok(last_claimer) = LAST_CLAIMER.load(deps.storage, i as u128) {
+                let claim_amount = last_claimer.pending_amount.min(*topup_amount);
+                if last_claimer.pending_amount == claim_amount {
+                    LAST_CLAIMER.remove(deps.storage, i as u128);
+                } else {
+                    LAST_CLAIMER.save(
+                        deps.storage,
+                        i as u128,
+                        &LastClaimerInfo {
+                            user_address: last_claimer.user_address.clone(),
+                            pending_amount: last_claimer
+                                .pending_amount
+                                .checked_sub(claim_amount)?,
+                        },
+                    )?;
+                }
                 msgs.push(build_transfer_asset_msg(
                     &last_claimer.user_address,
                     &config.asset,
-                    last_claimer.pending_amount,
+                    claim_amount,
                 )?);
+
+                attributes.extend(vec![
+                    attr("action", "genie_pending_claim"),
+                    attr("asset", config.asset.asset_string()),
+                    attr("amount", claim_amount),
+                    attr("receiver", last_claimer.user_address),
+                    attr("mission", i.to_string()),
+                ]);
+                state.unclaimed_amounts[i] =
+                    state.unclaimed_amounts[i].checked_sub(claim_amount)?;
             }
         }
-        state.unclaimed_amounts[i] = state.unclaimed_amounts[i].checked_add(*topup_amount)?;
     }
 
     STATE.save(deps.storage, &state)?;
@@ -235,6 +263,7 @@ pub fn handle_topup_cw20_incentives(
                     .join(","),
             ),
         ])
+        .add_attributes(attributes)
         .add_messages(msgs))
 }
 
@@ -334,19 +363,45 @@ pub fn handle_topup_native_incentives(
     CONFIG.save(deps.storage, &config)?;
 
     let mut msgs: Vec<CosmosMsg> = vec![];
+    let mut attributes: Vec<Attribute> = vec![];
 
-    // TODO LAST CLAIMER checks
     for (i, topup_amount) in topup_amounts.iter().enumerate() {
+        state.unclaimed_amounts[i] = state.unclaimed_amounts[i].checked_add(*topup_amount)?;
+
+        // Check for last claimer activity
         if !topup_amount.is_zero() {
             if let Ok(last_claimer) = LAST_CLAIMER.load(deps.storage, i as u128) {
+                let claim_amount = last_claimer.pending_amount.min(*topup_amount);
+                if last_claimer.pending_amount == claim_amount {
+                    LAST_CLAIMER.remove(deps.storage, i as u128);
+                } else {
+                    LAST_CLAIMER.save(
+                        deps.storage,
+                        i as u128,
+                        &LastClaimerInfo {
+                            user_address: last_claimer.user_address.clone(),
+                            pending_amount: last_claimer
+                                .pending_amount
+                                .checked_sub(claim_amount)?,
+                        },
+                    )?;
+                }
                 msgs.push(build_transfer_asset_msg(
                     &last_claimer.user_address,
                     &config.asset,
-                    last_claimer.pending_amount,
+                    claim_amount,
                 )?);
+                attributes.extend(vec![
+                    attr("action", "genie_pending_claim"),
+                    attr("asset", config.asset.asset_string()),
+                    attr("amount", claim_amount),
+                    attr("receiver", last_claimer.user_address),
+                    attr("mission", i.to_string()),
+                ]);
+                state.unclaimed_amounts[i] =
+                    state.unclaimed_amounts[i].checked_sub(claim_amount)?;
             }
         }
-        state.unclaimed_amounts[i] = state.unclaimed_amounts[i].checked_add(*topup_amount)?;
     }
     STATE.save(deps.storage, &state)?;
 
@@ -374,6 +429,7 @@ pub fn handle_topup_native_incentives(
                     .join(","),
             ),
         ])
+        .add_attributes(attributes)
         .add_messages(msgs))
 }
 
@@ -429,23 +485,26 @@ pub fn handle_claim(
                 "claim amount cannot be smaller than the claimed amount",
             ));
         }
-        let difference = amount.checked_sub(user_info.claimed_amounts[i])?;
-        let actual_claim_amount = state.unclaimed_amounts[i].min(difference);
+        let eligible_claim_amount = amount.checked_sub(user_info.claimed_amounts[i])?;
+        let actual_claim_amount = state.unclaimed_amounts[i].min(eligible_claim_amount);
 
         state.unclaimed_amounts[i] = state.unclaimed_amounts[i].checked_sub(actual_claim_amount)?;
 
         // check for last claimer eligibility
-        if state.unclaimed_amounts[i] == Uint128::zero() && difference > actual_claim_amount {
+        if state.unclaimed_amounts[i] == Uint128::zero()
+            && eligible_claim_amount > actual_claim_amount
+        {
             // TODO activate last claimer
             LAST_CLAIMER.save(
                 deps.storage,
                 i as u128,
                 &LastClaimerInfo {
                     user_address: recipient.clone(),
-                    pending_amount: difference.checked_sub(actual_claim_amount)?,
+                    pending_amount: eligible_claim_amount.checked_sub(actual_claim_amount)?,
                 },
             )?;
         }
+
         user_info.claimed_amounts[i] =
             user_info.claimed_amounts[i].checked_add(actual_claim_amount)?;
         claimable_amounts.push(actual_claim_amount);
