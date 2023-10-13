@@ -592,7 +592,7 @@ async function single_test3(factoryContract: string) {
   await waitUntil(starttime);
   await claim(userWallet, airdropContract, [2000000]);
   await waitUntil(endtime);
-  await transferUnclaimedTokens(protocolWallet, airdropContract, 4000000);
+  await transferUnclaimedTokens(protocolWallet, airdropContract);
 }
 
 /*
@@ -611,7 +611,7 @@ async function topup_test(factoryContract: string) {
     protocolWallet,
     factoryContract,
     asset_info,
-    [2000, 5000],
+    [2000, 5000, 3000],
     starttime,
     endtime,
     "5"
@@ -621,24 +621,25 @@ async function topup_test(factoryContract: string) {
   await increaseIncentives(
     protocolWallet,
     TOKEN_CONTRACT,
-    7000,
+    10000,
     airdropContract
   );
   await waitUntil(starttime);
-  await claim(userWallet, airdropContract, [3000, 3000]);
+  await claim(userWallet, airdropContract, [3000, 3000, 3000]);
   await wait(6000);
 
+  // last claimer should activate and claim additional 1000
   await topupIncentives(
     protocolWallet,
     TOKEN_CONTRACT,
-    [2000, 2000],
+    [2000, 2000, 2000],
     airdropContract
   );
   await wait(6000);
 
-  await claim(userWallet, airdropContract, [3000, 3000]);
+  await claim(userWallet, airdropContract, [4000, 4000, 4000]);
   await waitUntil(endtime);
-  await transferUnclaimedTokens(protocolWallet, airdropContract, 5000);
+  await transferUnclaimedTokens(protocolWallet, airdropContract);
 
   return airdropContract;
 }

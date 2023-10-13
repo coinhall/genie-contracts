@@ -218,6 +218,10 @@ pub fn handle_topup_cw20_incentives(
                         },
                     )?;
                 }
+                let mut user = USERS.load(deps.storage, &last_claimer.user_address)?;
+                user.claimed_amounts[i] = user.claimed_amounts[i].checked_add(claim_amount)?;
+                USERS.save(deps.storage, &last_claimer.user_address, &user)?;
+
                 msgs.push(build_transfer_asset_msg(
                     &last_claimer.user_address,
                     &config.asset,
@@ -386,6 +390,11 @@ pub fn handle_topup_native_incentives(
                         },
                     )?;
                 }
+
+                let mut user = USERS.load(deps.storage, &last_claimer.user_address)?;
+                user.claimed_amounts[i] = user.claimed_amounts[i].checked_add(claim_amount)?;
+                USERS.save(deps.storage, &last_claimer.user_address, &user)?;
+
                 msgs.push(build_transfer_asset_msg(
                     &last_claimer.user_address,
                     &config.asset,
@@ -493,8 +502,8 @@ pub fn handle_claim(
         // check for last claimer eligibility
         if state.unclaimed_amounts[i] == Uint128::zero()
             && eligible_claim_amount > actual_claim_amount
+            && actual_claim_amount > Uint128::zero()
         {
-            // TODO activate last claimer
             LAST_CLAIMER.save(
                 deps.storage,
                 i as u128,
