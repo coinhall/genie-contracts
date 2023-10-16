@@ -47,7 +47,7 @@ pub fn instantiate(
         asset: msg.asset,
         from_timestamp: msg.from_timestamp,
         to_timestamp: msg.to_timestamp,
-        allocated_amount: msg.allocated_amounts.iter().sum(),
+        allocated_amounts: msg.allocated_amounts.clone(),
         public_key: msg.public_key,
         mission_count: msg.allocated_amounts.len() as u64,
     };
@@ -190,14 +190,12 @@ pub fn handle_topup_cw20_incentives(
 
     state.protocol_funding += amount;
 
-    config.allocated_amount += amount;
-    CONFIG.save(deps.storage, &config)?;
-
     let mut msgs: Vec<CosmosMsg> = vec![];
     let mut attributes: Vec<Attribute> = vec![];
 
     // TODO LAST CLAIMER checks
     for (i, topup_amount) in topup_amounts.iter().enumerate() {
+        config.allocated_amounts[i] = config.allocated_amounts[i].checked_add(*topup_amount)?;
         state.unclaimed_amounts[i] = state.unclaimed_amounts[i].checked_add(*topup_amount)?;
 
         // Check for last claimer activity
@@ -242,6 +240,7 @@ pub fn handle_topup_cw20_incentives(
     }
 
     STATE.save(deps.storage, &state)?;
+    CONFIG.save(deps.storage, &config)?;
 
     Ok(Response::new()
         .add_attributes(vec![
@@ -363,14 +362,13 @@ pub fn handle_topup_native_incentives(
     state.protocol_funding += increase_amount;
 
     let mut config = CONFIG.load(deps.storage)?;
-    config.allocated_amount += increase_amount;
-    CONFIG.save(deps.storage, &config)?;
 
     let mut msgs: Vec<CosmosMsg> = vec![];
     let mut attributes: Vec<Attribute> = vec![];
 
     for (i, topup_amount) in topup_amounts.iter().enumerate() {
         state.unclaimed_amounts[i] = state.unclaimed_amounts[i].checked_add(*topup_amount)?;
+        config.allocated_amounts[i] = config.allocated_amounts[i].checked_add(*topup_amount)?;
 
         // Check for last claimer activity
         if !topup_amount.is_zero() {
@@ -413,6 +411,7 @@ pub fn handle_topup_native_incentives(
         }
     }
     STATE.save(deps.storage, &state)?;
+    CONFIG.save(deps.storage, &config)?;
 
     Ok(Response::new()
         .add_attributes(vec![
@@ -671,7 +670,7 @@ fn query_status(deps: Deps, env: &Env) -> StdResult<StatusResponse> {
 
     if env.block.time.seconds() >= config.from_timestamp
         && users_is_empty
-        && current_amount < config.allocated_amount
+        && current_amount < config.allocated_amounts.iter().sum()
     {
         Ok(StatusResponse {
             status: Status::Invalid,

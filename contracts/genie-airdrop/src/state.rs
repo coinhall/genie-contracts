@@ -16,7 +16,7 @@ pub struct Config {
     /// Timestamp for the end of this campaign
     pub to_timestamp: u64,
     /// Allocated amount of tokens for this campaign
-    pub allocated_amount: Uint128,
+    pub allocated_amounts: Vec<Uint128>,
     /// The public key used to verify claims
     pub public_key: Binary,
     /// The number of missions in this campaign
