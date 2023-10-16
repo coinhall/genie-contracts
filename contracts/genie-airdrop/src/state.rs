@@ -35,7 +35,7 @@ pub struct State {
 pub struct UserInfo {
     /// Assets claimed, per mission, by this account
     pub claimed_amounts: Vec<Uint128>,
-    /// If applicable to this campaign, lootboxes claimed, per mission, by this account 
+    /// If applicable to this campaign, lootboxes claimed, per mission, by this account
     pub claimed_lootbox: Option<Vec<Uint128>>,
 }
 
