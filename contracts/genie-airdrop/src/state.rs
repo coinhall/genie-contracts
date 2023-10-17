@@ -1,6 +1,6 @@
 use cosmwasm_std::{Addr, Binary, Uint128};
 use cw_storage_plus::{Item, Map};
-use genie::asset::AssetInfo;
+use genie::{airdrop::LastClaimerInfo, asset::AssetInfo};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
@@ -39,15 +39,7 @@ pub struct UserInfo {
     pub claimed_lootbox: Option<Vec<Uint128>>,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
-pub struct LastClaimerInfo {
-    /// Assets claimed, per mission, by this account
-    pub user_address: Addr,
-    /// If applicable to this campaign, lootboxes claimed, per mission, by this account
-    pub pending_amount: Uint128,
-}
-
 pub const CONFIG: Item<Config> = Item::new("config");
 pub const STATE: Item<State> = Item::new("state");
 pub const USERS: Map<&Addr, UserInfo> = Map::new("users");
-pub const LAST_CLAIMER: Map<u128, LastClaimerInfo> = Map::new("last_claimer");
+pub const LAST_CLAIMER: Map<u64, LastClaimerInfo> = Map::new("last_claimer");

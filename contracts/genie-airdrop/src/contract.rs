@@ -1,5 +1,5 @@
 use crate::crypto::is_valid_signature;
-use crate::state::{Config, LastClaimerInfo, State, CONFIG, LAST_CLAIMER, STATE, USERS};
+use crate::state::{Config, State, CONFIG, LAST_CLAIMER, STATE, USERS};
 use cosmwasm_std::{
     attr, entry_point, from_binary, to_binary, Attribute, Binary, CosmosMsg, Deps, DepsMut, Env,
     MessageInfo, Response, StdError, StdResult, Uint128,
@@ -7,8 +7,9 @@ use cosmwasm_std::{
 use cw2::set_contract_version;
 use cw20::Cw20ReceiveMsg;
 use genie::airdrop::{
-    ClaimPayload, ClaimResponse, Cw20HookMsg, ExecuteMsg, InstantiateMsg, QueryMsg, StateResponse,
-    Status, StatusResponse, UserInfoResponse, UserLootboxInfoResponse,
+    ClaimPayload, ClaimResponse, Cw20HookMsg, ExecuteMsg, InstantiateMsg, LastClaimerInfo,
+    LastClaimerInfoWithMissionID, QueryMsg, StateResponse, Status, StatusResponse,
+    UserInfoResponse, UserLootboxInfoResponse,
 };
 use genie::asset::{build_transfer_asset_msg, query_balance, AssetInfo};
 
@@ -200,14 +201,14 @@ pub fn handle_topup_cw20_incentives(
 
         // Check for last claimer activity
         if !topup_amount.is_zero() {
-            if let Ok(last_claimer) = LAST_CLAIMER.load(deps.storage, i as u128) {
+            if let Ok(last_claimer) = LAST_CLAIMER.load(deps.storage, i as u64) {
                 let claim_amount = last_claimer.pending_amount.min(*topup_amount);
                 if last_claimer.pending_amount == claim_amount {
-                    LAST_CLAIMER.remove(deps.storage, i as u128);
+                    LAST_CLAIMER.remove(deps.storage, i as u64);
                 } else {
                     LAST_CLAIMER.save(
                         deps.storage,
-                        i as u128,
+                        i as u64,
                         &LastClaimerInfo {
                             user_address: last_claimer.user_address.clone(),
                             pending_amount: last_claimer
@@ -372,14 +373,14 @@ pub fn handle_topup_native_incentives(
 
         // Check for last claimer activity
         if !topup_amount.is_zero() {
-            if let Ok(last_claimer) = LAST_CLAIMER.load(deps.storage, i as u128) {
+            if let Ok(last_claimer) = LAST_CLAIMER.load(deps.storage, i as u64) {
                 let claim_amount = last_claimer.pending_amount.min(*topup_amount);
                 if last_claimer.pending_amount == claim_amount {
-                    LAST_CLAIMER.remove(deps.storage, i as u128);
+                    LAST_CLAIMER.remove(deps.storage, i as u64);
                 } else {
                     LAST_CLAIMER.save(
                         deps.storage,
-                        i as u128,
+                        i as u64,
                         &LastClaimerInfo {
                             user_address: last_claimer.user_address.clone(),
                             pending_amount: last_claimer
@@ -505,7 +506,7 @@ pub fn handle_claim(
         {
             LAST_CLAIMER.save(
                 deps.storage,
-                i as u128,
+                i as u64,
                 &LastClaimerInfo {
                     user_address: recipient.clone(),
                     pending_amount: eligible_claim_amount.checked_sub(actual_claim_amount)?,
@@ -634,11 +635,24 @@ fn query_state(deps: Deps, env: Env) -> StdResult<StateResponse> {
     let state = STATE.load(deps.storage)?;
     let asset = CONFIG.load(deps.storage)?.asset;
     let current_balance = query_balance(&deps.querier, &env.contract.address, &asset)?;
+    // LOAD all the last_claimers
+    let last_claimers = LAST_CLAIMER
+        .range(deps.storage, None, None, cosmwasm_std::Order::Ascending)
+        .map(|item| {
+            let (mission_id, last_claimer) = item?;
+            Ok(LastClaimerInfoWithMissionID {
+                user_address: last_claimer.user_address,
+                pending_amount: last_claimer.pending_amount,
+                mission_id,
+            })
+        })
+        .collect::<StdResult<Vec<LastClaimerInfoWithMissionID>>>()?;
 
     Ok(StateResponse {
         unclaimed_amounts: state.unclaimed_amounts,
         protocol_funding: state.protocol_funding,
         current_balance,
+        last_claimer_info: last_claimers,
     })
 }
 

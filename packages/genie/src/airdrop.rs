@@ -1,5 +1,5 @@
 use crate::asset::AssetInfo;
-use cosmwasm_std::{Binary, Uint128};
+use cosmwasm_std::{Addr, Binary, Uint128};
 use cw20::Cw20ReceiveMsg;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -87,6 +87,24 @@ pub struct StatusResponse {
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+pub struct LastClaimerInfo {
+    /// Assets claimed, per mission, by this account
+    pub user_address: Addr,
+    /// If applicable to this campaign, lootboxes claimed, per mission, by this account
+    pub pending_amount: Uint128,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+pub struct LastClaimerInfoWithMissionID {
+    /// Assets claimed, per mission, by this account
+    pub user_address: Addr,
+    /// If applicable to this campaign, lootboxes claimed, per mission, by this account
+    pub pending_amount: Uint128,
+    /// Mission id
+    pub mission_id: u64,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct StateResponse {
     /// Unclaimed amount, per mission, currently in this contract
     pub unclaimed_amounts: Vec<Uint128>,
@@ -94,6 +112,8 @@ pub struct StateResponse {
     pub protocol_funding: Uint128,
     /// Actual amount of tokens in this contract
     pub current_balance: Uint128,
+    /// Last claimer info
+    pub last_claimer_info: Vec<LastClaimerInfoWithMissionID>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
