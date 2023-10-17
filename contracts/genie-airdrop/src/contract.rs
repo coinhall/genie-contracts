@@ -1,8 +1,8 @@
 use crate::crypto::is_valid_signature;
 use crate::state::{Config, State, CONFIG, LAST_CLAIMER, STATE, USERS};
 use cosmwasm_std::{
-    attr, entry_point, from_binary, to_binary, Attribute, Binary, CosmosMsg, Deps, DepsMut, Env,
-    MessageInfo, Response, StdError, StdResult, Uint128,
+    attr, entry_point, from_binary, to_binary, Binary, Deps, DepsMut, Env, MessageInfo, Response,
+    StdError, StdResult, Uint128,
 };
 use cw2::set_contract_version;
 use cw20::Cw20ReceiveMsg;
@@ -71,13 +71,12 @@ pub fn execute(
 ) -> Result<Response, StdError> {
     match msg {
         ExecuteMsg::Receive(msg) => receive_cw20(deps, env, info, msg),
-        ExecuteMsg::IncreaseIncentives {} => handle_increase_native_incentives(deps, env, info),
+        ExecuteMsg::IncreaseIncentives { topup_amounts } => {
+            handle_increase_native_incentives(deps, env, info, topup_amounts)
+        }
         ExecuteMsg::Claim { payload } => handle_claim(deps, env, info, payload),
         ExecuteMsg::TransferUnclaimedTokens { recipient } => {
             handle_transfer_unclaimed_tokens(deps, env, info, recipient)
-        }
-        ExecuteMsg::TopUpIncentives { topup_amounts } => {
-            handle_topup_native_incentives(deps, env, info, topup_amounts)
         }
     }
 }
@@ -125,54 +124,71 @@ pub fn receive_cw20(
     }
 
     match from_binary(&cw20_msg.msg)? {
-        Cw20HookMsg::IncreaseIncentives {} => {
-            handle_increase_cw20_incentives(deps, env, config.asset.asset_string(), cw20_msg.amount)
+        Cw20HookMsg::IncreaseIncentives { topup_amounts } => {
+            handle_increase_incentives(deps, env, cw20_msg.amount, topup_amounts)
         }
-        Cw20HookMsg::TopUpIncentives { topup_amounts } => handle_topup_cw20_incentives(
-            deps,
-            env,
-            config.asset.asset_string(),
-            cw20_msg.amount,
-            topup_amounts,
-        ),
     }
 }
 
-pub fn handle_increase_cw20_incentives(
+pub fn handle_increase_incentives(
     deps: DepsMut,
     env: Env,
-    asset: String,
     amount: Uint128,
+    topup_amounts: Option<Vec<Uint128>>,
 ) -> Result<Response, StdError> {
-    if query_status(deps.as_ref(), &env)?.status != Status::NotStarted {
-        return Err(StdError::generic_err(
-            "rewards can only be deposited before campaign starts",
-        ));
-    }
     let mut state = STATE.load(deps.storage)?;
     state.protocol_funding += amount;
     STATE.save(deps.storage, &state)?;
 
-    Ok(Response::new().add_attributes(vec![
-        attr("action", "genie_increase_rewards"),
-        attr("asset", asset),
-        attr("protocol_funding", state.protocol_funding),
-    ]))
+    let config = CONFIG.load(deps.storage)?;
+
+    let (attributes, msgs) = match query_status(deps.as_ref(), &env)? {
+        StatusResponse {
+            status: Status::Ongoing,
+        } => {
+            if topup_amounts.is_none() {
+                return Err(StdError::generic_err(
+                    "topup_amounts is required during ongoing campaign for mission allocation",
+                ));
+            }
+            let result = handle_topup(deps, env, amount, topup_amounts.unwrap())?;
+            (result.attributes, result.messages)
+        }
+        StatusResponse {
+            status: Status::NotStarted,
+        } => {
+            if topup_amounts.is_some() {
+                return Err(StdError::generic_err(
+                    "topup_amounts is not allowed during not started campaign, consider launching a new campaign",
+                ));
+            }
+            (vec![], vec![])
+        }
+        StatusResponse { status } => {
+            return Err(StdError::generic_err(format!(
+                "increase incentives is not allowed in {:?} status",
+                status
+            )));
+        }
+    };
+
+    Ok(Response::new()
+        .add_attributes(vec![
+            attr("action", "genie_increase_incentives"),
+            attr("asset", config.asset.asset_string()),
+            attr("protocol_funding", state.protocol_funding),
+            attr("increase_amount", amount),
+        ])
+        .add_attributes(attributes)
+        .add_submessages(msgs))
 }
 
-pub fn handle_topup_cw20_incentives(
+pub fn handle_topup(
     deps: DepsMut,
-    env: Env,
-    asset: String,
+    _env: Env,
     amount: Uint128,
     topup_amounts: Vec<Uint128>,
 ) -> Result<Response, StdError> {
-    if query_status(deps.as_ref(), &env)?.status != Status::Ongoing {
-        return Err(StdError::generic_err(
-            "topup can only be done while campaign is ongoing",
-        ));
-    }
-
     let mut state = STATE.load(deps.storage)?;
     let mut config = CONFIG.load(deps.storage)?;
 
@@ -189,12 +205,8 @@ pub fn handle_topup_cw20_incentives(
         ));
     }
 
-    state.protocol_funding += amount;
-
-    let mut msgs: Vec<CosmosMsg> = vec![];
-    let mut attributes: Vec<Attribute> = vec![];
-
-    // TODO LAST CLAIMER checks
+    let mut msgs = vec![];
+    let mut attributes = vec![];
     for (i, topup_amount) in topup_amounts.iter().enumerate() {
         config.allocated_amounts[i] = config.allocated_amounts[i].checked_add(*topup_amount)?;
         state.unclaimed_amounts[i] = state.unclaimed_amounts[i].checked_add(*topup_amount)?;
@@ -232,7 +244,7 @@ pub fn handle_topup_cw20_incentives(
                     attr("asset", config.asset.asset_string()),
                     attr("amount", claim_amount),
                     attr("receiver", last_claimer.user_address),
-                    attr("mission", i.to_string()),
+                    attr("mission_id", i.to_string()),
                 ]);
                 state.unclaimed_amounts[i] =
                     state.unclaimed_amounts[i].checked_sub(claim_amount)?;
@@ -245,10 +257,6 @@ pub fn handle_topup_cw20_incentives(
 
     Ok(Response::new()
         .add_attributes(vec![
-            attr("action", "genie_increase_rewards"),
-            attr("asset", asset),
-            attr("protocol_funding", state.protocol_funding),
-            attr("increase_amount", amount),
             attr(
                 "topup_amounts",
                 topup_amounts
@@ -275,19 +283,14 @@ pub fn handle_increase_native_incentives(
     deps: DepsMut,
     env: Env,
     info: MessageInfo,
+    topup_amounts: Option<Vec<Uint128>>,
 ) -> Result<Response, StdError> {
-    if query_status(deps.as_ref(), &env)?.status != Status::NotStarted {
-        return Err(StdError::generic_err(
-            "rewards can only be deposited before campaign starts",
-        ));
-    }
-
     let config = CONFIG.load(deps.storage)?;
     if info.sender != config.owner {
         return Err(StdError::generic_err("can only be called by owner"));
     }
 
-    let increase_amount: Uint128 = match config.asset.clone() {
+    let amount: Uint128 = match config.asset.clone() {
         AssetInfo::NativeToken { denom } => info
             .funds
             .iter()
@@ -298,148 +301,15 @@ pub fn handle_increase_native_incentives(
             return Err(StdError::generic_err("invalid asset type"));
         }
     };
-    if increase_amount.is_zero() {
+    if amount.is_zero() {
         return Err(StdError::generic_err("amount must be greater than 0"));
     }
 
     let mut state = STATE.load(deps.storage)?;
-    state.protocol_funding += increase_amount;
+    state.protocol_funding += amount;
     STATE.save(deps.storage, &state)?;
 
-    Ok(Response::new().add_attributes(vec![
-        attr("action", "genie_increase_rewards"),
-        attr("asset", config.asset.asset_string()),
-        attr("protocol_funding", state.protocol_funding),
-    ]))
-}
-
-pub fn handle_topup_native_incentives(
-    deps: DepsMut,
-    env: Env,
-    info: MessageInfo,
-    topup_amounts: Vec<Uint128>,
-) -> Result<Response, StdError> {
-    if query_status(deps.as_ref(), &env)?.status != Status::Ongoing {
-        return Err(StdError::generic_err(
-            "topup can only be done while campaign is ongoing",
-        ));
-    }
-
-    let config = CONFIG.load(deps.storage)?;
-    if info.sender != config.owner {
-        return Err(StdError::generic_err("can only be called by owner"));
-    }
-
-    let increase_amount: Uint128 = match config.asset.clone() {
-        AssetInfo::NativeToken { denom } => info
-            .funds
-            .iter()
-            .filter(|coin| coin.denom == denom)
-            .map(|coin| coin.amount)
-            .sum(),
-        AssetInfo::Token { contract_addr: _ } => {
-            return Err(StdError::generic_err("invalid asset type"));
-        }
-    };
-    if increase_amount.is_zero() {
-        return Err(StdError::generic_err("amount must be greater than 0"));
-    }
-
-    let mut state = STATE.load(deps.storage)?;
-
-    if topup_amounts.len() != state.unclaimed_amounts.len() {
-        return Err(StdError::generic_err(
-            "topup amount length does not match claimable amount length",
-        ));
-    }
-
-    let sum = topup_amounts.iter().sum::<Uint128>();
-    if increase_amount != sum {
-        return Err(StdError::generic_err(
-            "topup amount does not match the amount sent",
-        ));
-    }
-
-    state.protocol_funding += increase_amount;
-
-    let mut config = CONFIG.load(deps.storage)?;
-
-    let mut msgs: Vec<CosmosMsg> = vec![];
-    let mut attributes: Vec<Attribute> = vec![];
-
-    for (i, topup_amount) in topup_amounts.iter().enumerate() {
-        state.unclaimed_amounts[i] = state.unclaimed_amounts[i].checked_add(*topup_amount)?;
-        config.allocated_amounts[i] = config.allocated_amounts[i].checked_add(*topup_amount)?;
-
-        // Check for last claimer activity
-        if !topup_amount.is_zero() {
-            if let Ok(last_claimer) = LAST_CLAIMER.load(deps.storage, i as u64) {
-                let claim_amount = last_claimer.pending_amount.min(*topup_amount);
-                if last_claimer.pending_amount == claim_amount {
-                    LAST_CLAIMER.remove(deps.storage, i as u64);
-                } else {
-                    LAST_CLAIMER.save(
-                        deps.storage,
-                        i as u64,
-                        &LastClaimerInfo {
-                            user_address: last_claimer.user_address.clone(),
-                            pending_amount: last_claimer
-                                .pending_amount
-                                .checked_sub(claim_amount)?,
-                        },
-                    )?;
-                }
-
-                let mut user = USERS.load(deps.storage, &last_claimer.user_address)?;
-                user.claimed_amounts[i] = user.claimed_amounts[i].checked_add(claim_amount)?;
-                USERS.save(deps.storage, &last_claimer.user_address, &user)?;
-
-                msgs.push(build_transfer_asset_msg(
-                    &last_claimer.user_address,
-                    &config.asset,
-                    claim_amount,
-                )?);
-                attributes.extend(vec![
-                    attr("action", "genie_pending_claim"),
-                    attr("asset", config.asset.asset_string()),
-                    attr("amount", claim_amount),
-                    attr("receiver", last_claimer.user_address),
-                    attr("mission", i.to_string()),
-                ]);
-                state.unclaimed_amounts[i] =
-                    state.unclaimed_amounts[i].checked_sub(claim_amount)?;
-            }
-        }
-    }
-    STATE.save(deps.storage, &state)?;
-    CONFIG.save(deps.storage, &config)?;
-
-    Ok(Response::new()
-        .add_attributes(vec![
-            attr("action", "genie_increase_rewards"),
-            attr("asset", config.asset.asset_string()),
-            attr("protocol_funding", state.protocol_funding),
-            attr("increase_amount", increase_amount),
-            attr(
-                "topup_amounts",
-                topup_amounts
-                    .iter()
-                    .map(|x| x.to_string())
-                    .collect::<Vec<String>>()
-                    .join(","),
-            ),
-            attr(
-                "unclaimed_amounts",
-                state
-                    .unclaimed_amounts
-                    .iter()
-                    .map(|x| x.to_string())
-                    .collect::<Vec<String>>()
-                    .join(","),
-            ),
-        ])
-        .add_attributes(attributes)
-        .add_messages(msgs))
+    handle_increase_incentives(deps, env, amount, topup_amounts)
 }
 
 pub fn handle_claim(

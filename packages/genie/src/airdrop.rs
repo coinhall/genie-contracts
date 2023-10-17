@@ -19,24 +19,14 @@ pub struct InstantiateMsg {
 pub enum ExecuteMsg {
     Receive(Cw20ReceiveMsg),
     Claim { payload: Binary },
-    IncreaseIncentives {},
+    IncreaseIncentives { topup_amounts: Option<Vec<Uint128>> },
     TransferUnclaimedTokens { recipient: String },
-    TopUpIncentives { topup_amounts: Vec<Uint128> },
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum Cw20HookMsg {
-    IncreaseIncentives {},
-    TopUpIncentives { topup_amounts: Vec<Uint128> },
-}
-
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
-#[serde(rename_all = "snake_case")]
-pub struct ClaimPayload {
-    pub claim_amounts: Vec<Uint128>,
-    pub signature: Binary,
-    pub lootbox_info: Option<Vec<Uint128>>,
+    IncreaseIncentives { topup_amounts: Option<Vec<Uint128>> },
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
