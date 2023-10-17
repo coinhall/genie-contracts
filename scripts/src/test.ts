@@ -637,7 +637,7 @@ async function topup_test(factoryContract: string) {
   );
   await wait(6000);
 
-  await claim(userWallet, airdropContract, [4000, 4000, 4000]);
+  await claim(userWallet, airdropContract, [4000, 20000, 20000]);
   await waitUntil(endtime);
   await transferUnclaimedTokens(protocolWallet, airdropContract);
 
