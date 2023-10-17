@@ -116,9 +116,6 @@ pub fn receive_cw20(
         }
     };
 
-    if cw20_msg.sender != config.owner {
-        return Err(StdError::generic_err("can only be called by owner"));
-    }
     if cw20_msg.amount.is_zero() {
         return Err(StdError::generic_err("amount must be greater than 0"));
     }
@@ -286,10 +283,6 @@ pub fn handle_increase_native_incentives(
     topup_amounts: Option<Vec<Uint128>>,
 ) -> Result<Response, StdError> {
     let config = CONFIG.load(deps.storage)?;
-    if info.sender != config.owner {
-        return Err(StdError::generic_err("can only be called by owner"));
-    }
-
     let amount: Uint128 = match config.asset.clone() {
         AssetInfo::NativeToken { denom } => info
             .funds
