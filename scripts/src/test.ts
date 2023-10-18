@@ -236,7 +236,7 @@ async function topupIncentives(
       amount: amount.reduce((a, b) => a + b, 0).toString(),
       msg: Buffer.from(
         JSON.stringify({
-          increase_Incentives: {
+          increase_incentives: {
             topup_amounts: amount.map((x) => x.toString()),
           },
         })
