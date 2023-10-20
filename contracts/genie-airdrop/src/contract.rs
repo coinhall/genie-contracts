@@ -188,14 +188,14 @@ pub fn handle_increase_incentives(
     STATE.save(storage, &state)?;
 
     Ok(Response::new()
+        .add_messages(msgs)
         .add_attributes(vec![
             attr("action", "genie_increase_incentives"),
             attr("asset", config.asset.asset_string()),
             attr("protocol_funding", state.protocol_funding),
             attr("increase_amount", amount),
         ])
-        .add_attributes(attributes)
-        .add_messages(msgs))
+        .add_attributes(attributes))
 }
 
 pub fn handle_topup(
