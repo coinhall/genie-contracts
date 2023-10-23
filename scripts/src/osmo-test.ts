@@ -232,7 +232,7 @@ async function topupOsmoIncentives(
   airdropContract: string
 ) {
   const msg = {
-    top_up_incentives: {
+    increase_incentives: {
       topup_amounts: amount.map((x) => x.toString()),
     },
   };
@@ -275,6 +275,7 @@ async function increaseOsmoIncentives(
   const res = await client.tx.broadcast(tx, chainID);
   console.log(res);
 }
+
 async function claim(
   wallet: Wallet,
   airdropContract: string,
@@ -291,22 +292,27 @@ async function claim(
   const sigObj = secp256k1.ecdsaSign(msg, private_key);
   const signature = Buffer.from(sigObj.signature).toString("base64");
 
-  // Generate cosmwasm 'binary' base64 string from amount array
-  let amounts_string = amounts.map((amt) => amt.toString()).join(",");
-  const claim_amounts_string = Buffer.from(amounts_string).toString("base64");
+  let amounts_string_array = amounts.map((amt) =>
+    amt.toLocaleString("fullwide", { useGrouping: false })
+  );
 
-  let lootinfo = amounts.map((amt) => Math.floor(amt / 10)).join(",");
+  let lootbox_info = amounts
+    .map((amt) => Math.ceil(amt / 10))
+    .map((amt) => amt.toLocaleString("fullwide", { useGrouping: false }));
+
+  let claim_payload = JSON.stringify({
+    claim_amounts: amounts_string_array,
+    signature: signature,
+    lootbox_info: lootbox_info,
+  });
+  claim_payload = Buffer.from(claim_payload).toString("base64");
 
   const claim = new MsgExecuteContract(
-    wallet.key.accAddress(prefix),
+    wallet.key.accAddress("osmo"),
     airdropContract,
     {
       claim: {
-        signature: signature,
-        claim_amounts: claim_amounts_string,
-        lootbox_info: {
-          claimed_lootbox: Buffer.from(lootinfo).toString("base64"),
-        },
+        payload: claim_payload,
       },
     },
     {}
@@ -324,15 +330,13 @@ async function claim(
 
 async function transferUnclaimedTokens(
   wallet: Wallet,
-  airdropContract: string,
-  amount: number
+  airdropContract: string
 ) {
   const transferUnclaimed = new MsgExecuteContract(
     wallet.key.accAddress(prefix),
     airdropContract,
     {
       transfer_unclaimed_tokens: {
-        amount: amount.toString(),
         recipient: wallet.key.accAddress(prefix),
       },
     },
@@ -482,13 +486,13 @@ async function test1(factoryContract: string) {
   await wait(6000);
   await claim(userWallet, airdropContract, [4_000, 0, 1_000]);
   await waitUntil(endtime);
-  await transferUnclaimedTokens(protocolWallet, airdropContract, 27_000);
+  await transferUnclaimedTokens(protocolWallet, airdropContract);
   return airdropContract;
 }
 
 async function single_test1(factoryContract: string) {
   const starttime = Math.trunc(Date.now() / 1000 + 60);
-  const endtime = Math.trunc(Date.now() / 1000 + 500);
+  const endtime = Math.trunc(Date.now() / 1000 + 200);
 
   await wait(6000);
 
@@ -505,8 +509,6 @@ async function single_test1(factoryContract: string) {
   await increaseOsmoIncentives(protocolWallet, airdropContract, 2000);
   await wait(6000);
   await increaseOsmoIncentives(protocolWallet, airdropContract, 7000);
-  await wait(6000);
-  await transferUnclaimedTokens(protocolWallet, airdropContract, 4000);
   await waitUntil(starttime);
   await claim(userWallet, airdropContract, [2000]);
   await wait(6000); // Wait a bit for wallet nonce to update.
@@ -516,6 +518,9 @@ async function single_test1(factoryContract: string) {
   await wait(6000);
   await claim(hallwallet, airdropContract, [1000]);
   await wait(6000);
+
+  await waitUntil(endtime);
+  await transferUnclaimedTokens(protocolWallet, airdropContract);
   return airdropContract;
 }
 
@@ -544,7 +549,7 @@ async function single_test2(factoryContract: string) {
 
   await waitUntil(endtime);
 
-  transferUnclaimedTokens(protocolWallet, airdropContract, 2000);
+  transferUnclaimedTokens(protocolWallet, airdropContract);
 }
 
 async function single_test3(factoryContract: string) {
@@ -564,7 +569,7 @@ async function single_test3(factoryContract: string) {
   await waitUntil(starttime);
   await claim(userWallet, airdropContract, [2000]);
   await waitUntil(endtime);
-  await transferUnclaimedTokens(protocolWallet, airdropContract, 4000);
+  await transferUnclaimedTokens(protocolWallet, airdropContract);
 }
 
 /*
@@ -602,7 +607,7 @@ async function topup_test(factoryContract: string) {
 
   await claim(userWallet, airdropContract, [3000, 3000]);
   await waitUntil(endtime);
-  await transferUnclaimedTokens(protocolWallet, airdropContract, 5000);
+  await transferUnclaimedTokens(protocolWallet, airdropContract);
 
   return airdropContract;
 }
