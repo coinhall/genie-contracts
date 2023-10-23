@@ -1,6 +1,6 @@
 use cosmwasm_std::{Addr, Binary, Uint128};
 use cw_storage_plus::{Item, Map};
-use genie::asset::AssetInfo;
+use genie::{airdrop::LastClaimerInfo, asset::AssetInfo};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
@@ -16,7 +16,7 @@ pub struct Config {
     /// Timestamp for the end of this campaign
     pub to_timestamp: u64,
     /// Allocated amount of tokens for this campaign
-    pub allocated_amount: Uint128,
+    pub allocated_amounts: Vec<Uint128>,
     /// The public key used to verify claims
     pub public_key: Binary,
     /// The number of missions in this campaign
@@ -42,3 +42,4 @@ pub struct UserInfo {
 pub const CONFIG: Item<Config> = Item::new("config");
 pub const STATE: Item<State> = Item::new("state");
 pub const USERS: Map<&Addr, UserInfo> = Map::new("users");
+pub const LAST_CLAIMER: Map<u64, LastClaimerInfo> = Map::new("last_claimer");
