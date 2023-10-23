@@ -56,12 +56,12 @@ if (!PUBLICKEY) {
 }
 
 const client = new LCDClient({
-  "osmo-test-5": {
+  chainID: {
     lcd: "https://lcd.osmotest5.osmosis.zone/",
     chainID: chainID,
     gasAdjustment: 1.75,
     gasPrices: { uosmo: 0.015 },
-    prefix: "osmo",
+    prefix: prefix,
   },
 });
 
@@ -284,21 +284,17 @@ async function claim(
   const private_key = Buffer.from(PRIVATEKEY ?? "", "base64");
   const account = wallet.key.accAddress(prefix);
   const claimsContract = airdropContract;
-  const amountstr = amounts
-    .map((x) => x.toLocaleString("fullwide", { useGrouping: false }))
-    .join(",");
+  const amountstr = amounts.map((x) => x.toString()).join(",");
   const claimstr = account + "," + amountstr + "," + claimsContract;
   const msg = keccak256(Buffer.from(claimstr));
   const sigObj = secp256k1.ecdsaSign(msg, private_key);
   const signature = Buffer.from(sigObj.signature).toString("base64");
 
-  let amounts_string_array = amounts.map((amt) =>
-    amt.toLocaleString("fullwide", { useGrouping: false })
-  );
+  let amounts_string_array = amounts.map((amt) => amt.toString());
 
   let lootbox_info = amounts
     .map((amt) => Math.ceil(amt / 10))
-    .map((amt) => amt.toLocaleString("fullwide", { useGrouping: false }));
+    .map((amt) => amt.toString());
 
   let claim_payload = JSON.stringify({
     claim_amounts: amounts_string_array,
@@ -308,7 +304,7 @@ async function claim(
   claim_payload = Buffer.from(claim_payload).toString("base64");
 
   const claim = new MsgExecuteContract(
-    wallet.key.accAddress("osmo"),
+    wallet.key.accAddress(prefix),
     airdropContract,
     {
       claim: {
