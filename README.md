@@ -7,10 +7,11 @@
 This repository has two main contracts:
 
 1. [**`genie-airdrop`**](./contracts/genie-airdrop/README.md): the contract to be instantiated per campaign, and which end users claim rewards from
-   - Deployed `phoenix-1` code ID: `1682`
+   - `phoenix-1`: `1942` (code ID)
+   - `osmosis-1`: `256` (code ID)
 2. [**`genie-airdrop-factory`**](./contracts/genie-airdrop-factory/README.md): the factory contract to instantiate the `genie-airdrop` contract
-   - Deployed `phoenix-1` code ID: `1683`
-   - Deployed `phoenix-1` contract: `terra1dcfnzx0lh27w7rjh69e6kl5838dc7yyjj3r3h84jmkjjf08kknuqxr0x3r`
+   - `phoenix-1`: `1683` (code ID), `terra1dcfnzx0lh27w7rjh69e6kl5838dc7yyjj3r3h84jmkjjf08kknuqxr0x3r` (contract)
+   - `osmosis-1`: `194` (code ID), `osmo1vjq3e3fp4fcdnd83nmxk5764mlewwxjejsjmg9jyehgh5zklj0pslvs3na` (contract)
 
 Refer to their respective READMEs for more information about how they work.
 
