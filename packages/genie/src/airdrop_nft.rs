@@ -1,13 +1,12 @@
-use crate::asset::AssetInfo;
+use crate::asset::NftInfo;
 use cosmwasm_std::{Addr, Binary, Uint128};
-use cw20::Cw20ReceiveMsg;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct InstantiateMsg {
     pub owner: String,
-    pub asset: AssetInfo,
+    pub asset: NftInfo,
     pub public_key: Binary,
     pub from_timestamp: u64,
     pub to_timestamp: u64,
@@ -17,10 +16,9 @@ pub struct InstantiateMsg {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum ExecuteMsg {
-    Receive(Cw20ReceiveMsg),
     Claim { payload: Binary },
     IncreaseIncentives { topup_amounts: Option<Vec<Uint128>> },
-    TransferUnclaimedTokens { recipient: String },
+    ReturnOwnership { recipient: Addr },
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
@@ -35,7 +33,7 @@ pub struct ClaimNftPayload {
     pub claim_amounts: Vec<Uint128>,
     pub signature: Binary,
     pub lootbox_info: Option<Vec<Uint128>>,
-    pub nft_info: Vec<Binary>,
+    pub mint_info: Vec<Binary>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
@@ -92,27 +90,10 @@ pub struct LastClaimerInfo {
     /// If applicable to this campaign, lootboxes claimed, per mission, by this account
     pub pending_amount: Uint128,
 }
-
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
-pub struct LastClaimerInfoWithMissionID {
-    /// Assets claimed, per mission, by this account
-    pub user_address: Addr,
-    /// If applicable to this campaign, lootboxes claimed, per mission, by this account
-    pub pending_amount: Uint128,
-    /// Mission id
-    pub mission_id: u64,
-}
-
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct StateResponse {
     /// Unclaimed amount, per mission, currently in this contract
     pub unclaimed_amounts: Vec<Uint128>,
-    /// Total funds protocol has sent and removed to this contract via `increase_incentives` and `transfer_unclaimed_tokens`
-    pub protocol_funding: Uint128,
-    /// Actual amount of tokens in this contract
-    pub current_balance: Uint128,
-    /// Last claimer info
-    pub last_claimer_info: Vec<LastClaimerInfoWithMissionID>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]

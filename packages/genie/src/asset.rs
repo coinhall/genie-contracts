@@ -1,8 +1,9 @@
 use cosmwasm_std::{
-    to_binary, Addr, AllBalanceResponse, BankMsg, BankQuery, Coin, CosmosMsg, QuerierWrapper,
-    QueryRequest, StdResult, Uint128, WasmMsg, WasmQuery,
+    to_json_binary, Addr, AllBalanceResponse, BankMsg, BankQuery, Coin, CosmosMsg, Empty,
+    QuerierWrapper, QueryRequest, StdError, StdResult, Uint128, WasmMsg, WasmQuery,
 };
 use cw20::{BalanceResponse, Cw20ExecuteMsg, Cw20QueryMsg};
+
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
@@ -14,6 +15,19 @@ pub enum AssetInfo {
     NativeToken { denom: String },
 }
 
+/// A wrapper to represent both native coins and cw20 tokens as a single type
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub struct NftInfo {
+    pub contract_addr: Addr,
+}
+
+impl NftInfo {
+    pub fn asset_string(&self) -> String {
+        self.contract_addr.to_string()
+    }
+}
+
 impl AssetInfo {
     pub fn asset_string(&self) -> String {
         match self {
@@ -21,6 +35,20 @@ impl AssetInfo {
             AssetInfo::NativeToken { denom } => denom.to_string(),
         }
     }
+}
+
+pub fn query_owner(querier: &QuerierWrapper, contract_addr: &Addr) -> StdResult<Addr> {
+    let query: cw_ownable::Ownership<Addr> =
+        querier.query(&QueryRequest::Wasm(WasmQuery::Smart {
+            contract_addr: contract_addr.into(),
+            msg: to_json_binary(&cw721_base::QueryMsg::<Empty>::Ownership {})?,
+        }))?;
+
+    if query.owner.is_none() {
+        return Err(StdError::generic_err("No owner"));
+    }
+
+    Ok(query.owner.unwrap())
 }
 
 /// Queries the balance of `asset` in `account_addr`
@@ -61,7 +89,7 @@ fn get_cw20_balance(
 ) -> StdResult<Uint128> {
     let query: BalanceResponse = querier.query(&QueryRequest::Wasm(WasmQuery::Smart {
         contract_addr: token_address.into(),
-        msg: to_binary(&Cw20QueryMsg::Balance {
+        msg: to_json_binary(&Cw20QueryMsg::Balance {
             address: account_addr.into(),
         })?,
     }))?;
@@ -103,7 +131,7 @@ fn build_transfer_cw20_token_msg(
 ) -> StdResult<CosmosMsg> {
     Ok(CosmosMsg::Wasm(WasmMsg::Execute {
         contract_addr: token_contract_address,
-        msg: to_binary(&Cw20ExecuteMsg::Transfer {
+        msg: to_json_binary(&Cw20ExecuteMsg::Transfer {
             recipient: recipient.into(),
             amount,
         })?,
