@@ -7,6 +7,8 @@ use cw20::{BalanceResponse, Cw20ExecuteMsg, Cw20QueryMsg};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
+use crate::cw_721;
+
 /// A wrapper to represent both native coins and cw20 tokens as a single type
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
@@ -41,7 +43,7 @@ pub fn query_owner(querier: &QuerierWrapper, contract_addr: &Addr) -> StdResult<
     let query: cw_ownable::Ownership<Addr> =
         querier.query(&QueryRequest::Wasm(WasmQuery::Smart {
             contract_addr: contract_addr.into(),
-            msg: to_json_binary(&cw721_base::QueryMsg::<Empty>::Ownership {})?,
+            msg: to_json_binary(&cw_721::QueryMsg::<Empty>::Ownership {})?,
         }))?;
 
     if query.owner.is_none() {

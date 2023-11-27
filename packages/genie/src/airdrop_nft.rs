@@ -19,6 +19,7 @@ pub enum ExecuteMsg {
     Claim { payload: Binary },
     IncreaseIncentives { topup_amounts: Option<Vec<Uint128>> },
     ReturnOwnership { recipient: Addr },
+    ReceiveOwnership {},
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
@@ -34,14 +35,6 @@ pub struct ClaimNftPayload {
     pub signature: Binary,
     pub lootbox_info: Option<Vec<Uint128>>,
     pub mint_info: Vec<Binary>,
-}
-
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
-#[serde(rename_all = "snake_case")]
-pub struct ClaimPayload {
-    pub claim_amounts: Vec<Uint128>,
-    pub signature: Binary,
-    pub lootbox_info: Option<Vec<Uint128>>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]

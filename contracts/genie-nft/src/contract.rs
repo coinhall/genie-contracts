@@ -1,5 +1,5 @@
 use crate::crypto::is_valid_signature;
-use crate::state::{Config, State, CONFIG, LAST_CLAIMER, STATE, USERS};
+use crate::state::{Config, State, CONFIG, STATE, USERS};
 use cosmwasm_std::{
     attr, entry_point, from_json, to_json_binary, Addr, Binary, CosmosMsg, Deps, DepsMut, Env,
     MessageInfo, Response, StdError, StdResult, Uint128, WasmMsg,
@@ -10,7 +10,6 @@ use genie::airdrop_nft::{
     StatusResponse, UserInfoResponse, UserLootboxInfoResponse,
 };
 use genie::asset::query_owner;
-
 // use cw_ownable::{Action, Ownership, OwnershipError};
 
 const CONTRACT_NAME: &str = "genie-nft";
@@ -76,6 +75,7 @@ pub fn execute(
         ExecuteMsg::IncreaseIncentives { topup_amounts } => {
             handle_increase_incentives(deps, env, info, topup_amounts)
         }
+        ExecuteMsg::ReceiveOwnership {} => handle_receive_ownership(deps, env, info),
     }
 }
 
@@ -93,6 +93,29 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> StdResult<Binary> {
             to_json_binary(&query_user_lootbox_data(deps, address)?)
         }
     }
+}
+
+pub fn handle_receive_ownership(
+    deps: DepsMut,
+    _env: Env,
+    info: MessageInfo,
+) -> Result<Response, StdError> {
+    let config = CONFIG.load(deps.storage)?;
+    if info.sender != config.asset.contract_addr {
+        return Err(StdError::generic_err("unauthorized"));
+    }
+
+    let messages = vec![CosmosMsg::Wasm(WasmMsg::Execute {
+        contract_addr: config.asset.contract_addr.to_string(),
+        msg: to_json_binary(&cw_ownable::Action::AcceptOwnership {})?,
+        funds: vec![],
+    })];
+
+    Result::Ok(
+        Response::new()
+            .add_attribute("action", "receive_ownership")
+            .add_messages(messages),
+    )
 }
 
 pub fn handle_transfer_ownership(
