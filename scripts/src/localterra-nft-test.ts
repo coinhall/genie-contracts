@@ -336,20 +336,24 @@ async function increaseIncentives(
 }
 
 type MintInfo = {
-  token_id: string;
-  owner: string;
-  token_uri: string;
+  mint: {
+    token_id: string;
+    owner: string;
+    token_uri: string;
+  };
 };
 let offset = 0;
 function generateMintInfo(amount: number, receipient: string) {
   let mint_info: string[] = [];
-  for (let i = offset; i < offset + amount; i++) {
+  for (let i = offset; i < amount; i++) {
     let mint_info_obj: MintInfo = {
-      token_id: i.toString(),
-      owner: receipient,
-      token_uri:
-        "https://ipfs.io/ipfs/QmeSjSinHpPnmXmspMjwiXyN6zS4E9zccariGR3jxcaWtq/" +
-        i.toString(),
+      mint: {
+        token_id: i.toString(),
+        owner: receipient,
+        token_uri:
+          "https://ipfs.io/ipfs/QmeSjSinHpPnmXmspMjwiXyN6zS4E9zccariGR3jxcaWtq/" +
+          i.toString(),
+      },
     };
     mint_info.push(
       Buffer.from(JSON.stringify(mint_info_obj)).toString("base64")
@@ -434,16 +438,50 @@ async function transferNftContract(
     {
       update_ownership: {
         transfer_ownership: {
-          new_owner: nftContract,
+          new_owner: airdropContract,
+          expiry: {
+            never: {},
+          },
         },
       },
     },
     {}
   );
-  const tx = await wallet.createAndSignTx({
-    msgs: [transferNft],
-    chainID: chainID,
+  const tx = await wallet
+    .createAndSignTx({
+      msgs: [transferNft],
+      chainID: chainID,
+    })
+    .catch((err) => {
+      console.log(err);
+      throw err;
+    });
+  console.log(tx);
+  console.log("----------------------------------");
+  const res = await terra.tx.broadcast(tx, chainID).catch((err) => {
+    console.log(err);
+    throw err;
   });
+  console.log(res);
+}
+async function receiveNftContract(wallet: Wallet, airdropContract: string) {
+  const receiveNft = new MsgExecuteContract(
+    wallet.key.accAddress(prefix),
+    airdropContract,
+    {
+      receive_ownership: {},
+    },
+    {}
+  );
+  const tx = await wallet
+    .createAndSignTx({
+      msgs: [receiveNft],
+      chainID: chainID,
+    })
+    .catch((err) => {
+      console.log(err);
+      throw err;
+    });
   console.log(tx);
   console.log("----------------------------------");
   const res = await terra.tx.broadcast(tx, chainID);
@@ -486,14 +524,14 @@ async function testall() {
 
   await wait(3000);
   console.log("INSTANTIATING NFT");
-  await instantiateNft(hallwallet, codes[3]);
+  await instantiateNft(protocolWallet, codes[3]);
   console.log("INSTANTIATING FACTORY");
   const factoryContract = await instantiateFactory(
     hallwallet,
     codes[0],
     codes[1]
   );
-  const nftContract = await instantiateNft(hallwallet, codes[3]);
+  const nftContract = await instantiateNft(protocolWallet, codes[3]);
 
   await testnft1(nftContract, factoryContract, codes);
 
@@ -508,7 +546,7 @@ async function testnft1(
   const starttime = Math.trunc(Date.now() / 1000 + 10);
   const endtime = Math.trunc(Date.now() / 1000 + 50);
   let airdropContract = await instatiateAirdropNft(
-    hallwallet,
+    protocolWallet,
     codes[2],
     starttime,
     endtime,
@@ -516,7 +554,11 @@ async function testnft1(
     nft_contract
   );
 
-  await transferNftContract(hallwallet, nft_contract, airdropContract);
+  console.log("Transfering NFT to airdrop contract");
+  await transferNftContract(protocolWallet, nft_contract, airdropContract);
+  console.log("Receiving NFT from airdrop contract");
+  await receiveNftContract(protocolWallet, airdropContract);
+  console.log("Transfer Done.");
 
   await waitUntil(starttime);
   await claim(userWallet, airdropContract, [2, 0, 0]);
@@ -534,11 +576,7 @@ async function testnft1(
   // This should not error anymore
   await claim(userWallet, airdropContract, [3, 0, 0]);
   await wait(1500);
-  await claim(
-    protocolWallet,
-    airdropContract,
-    [5_000_000, 5_000_000, 5_000_000]
-  );
+  await claim(protocolWallet, airdropContract, [5, 5, 5]);
   await wait(1500);
   await claim(hallwallet, airdropContract, [10, 1, 1]);
   await wait(1500);

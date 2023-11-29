@@ -11,52 +11,43 @@ use schemars::JsonSchema;
 #[cw_ownable_execute]
 #[cw_serde]
 pub enum ExecuteMsg<T, E> {
-    /// Transfer is a base message to move a token to another account without triggering actions
-    TransferNft { recipient: String, token_id: String },
-    /// Send is a base message to transfer a token to a contract and trigger an action
-    /// on the receiving contract.
+    TransferNft {
+        recipient: String,
+        token_id: String,
+    },
     SendNft {
         contract: String,
         token_id: String,
         msg: Binary,
     },
-    /// Allows operator to transfer / send the token from the owner's account.
-    /// If expiration is set, then this allowance has a time/height limit
     Approve {
         spender: String,
         token_id: String,
         expires: Option<Expiration>,
     },
-    /// Remove previously granted Approval
-    Revoke { spender: String, token_id: String },
-    /// Allows operator to transfer / send any token from the owner's account.
-    /// If expiration is set, then this allowance has a time/height limit
+    Revoke {
+        spender: String,
+        token_id: String,
+    },
     ApproveAll {
         operator: String,
         expires: Option<Expiration>,
     },
-    /// Remove previously granted ApproveAll permission
-    RevokeAll { operator: String },
-
-    /// Mint a new NFT, can only be called by the contract minter
+    RevokeAll {
+        operator: String,
+    },
     Mint {
-        /// Unique ID of the NFT
         token_id: String,
-        /// The owner of the newly minter NFT
         owner: String,
-        /// Universal resource identifier for this NFT
-        /// Should point to a JSON file that conforms to the ERC721
-        /// Metadata JSON Schema
         token_uri: Option<String>,
-        /// Any custom extension used by this contract
         extension: T,
     },
-
-    /// Burn an NFT the sender has access to
-    Burn { token_id: String },
-
-    /// Extension msg
-    Extension { msg: E },
+    Burn {
+        token_id: String,
+    },
+    Extension {
+        msg: E,
+    },
 }
 
 #[cw_ownable_query]
