@@ -1,13 +1,11 @@
 use cosmwasm_std::{
-    to_json_binary, Addr, AllBalanceResponse, BankMsg, BankQuery, Coin, CosmosMsg, Empty,
-    QuerierWrapper, QueryRequest, StdError, StdResult, Uint128, WasmMsg, WasmQuery,
+    to_json_binary, Addr, AllBalanceResponse, BankMsg, BankQuery, Coin, CosmosMsg, QuerierWrapper,
+    QueryRequest, StdResult, Uint128, WasmMsg, WasmQuery,
 };
 use cw20::{BalanceResponse, Cw20ExecuteMsg, Cw20QueryMsg};
 
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
-
-use crate::cw_721;
 
 /// A wrapper to represent both native coins and cw20 tokens as a single type
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
@@ -37,20 +35,6 @@ impl AssetInfo {
             AssetInfo::NativeToken { denom } => denom.to_string(),
         }
     }
-}
-
-pub fn query_owner(querier: &QuerierWrapper, contract_addr: &Addr) -> StdResult<Addr> {
-    let query: cw_ownable::Ownership<Addr> =
-        querier.query(&QueryRequest::Wasm(WasmQuery::Smart {
-            contract_addr: contract_addr.into(),
-            msg: to_json_binary(&cw_721::QueryMsg::<Empty>::Ownership {})?,
-        }))?;
-
-    if query.owner.is_none() {
-        return Err(StdError::generic_err("No owner"));
-    }
-
-    Ok(query.owner.unwrap())
 }
 
 /// Queries the balance of `asset` in `account_addr`

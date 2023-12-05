@@ -11,6 +11,7 @@ import * as fs from "fs";
 import * as path from "path";
 import * as secp256k1 from "secp256k1";
 import keccak256 from "keccak256";
+import exp from "constants";
 
 console.log("Example usage: yarn start src/localterra-nft-test.ts --m1");
 
@@ -36,7 +37,7 @@ const prefix = "terra";
 const FACTORY_CONTRACT = "genie-airdrop-factory";
 const GENIE_CONTRACT = "genie-airdrop";
 const GENIE_NFT_CONTRACT = "genie-nft";
-const NFT_CONTRACT = "cw721-base";
+const NFT_CONTRACT = "cw721-metadata-onchain";
 const contracts = [
   FACTORY_CONTRACT,
   GENIE_CONTRACT,
@@ -79,7 +80,6 @@ if (!PUBLICKEY) {
 
 const terra = new LCDClient({
   localterra: {
-    // key must be the chainID
     lcd: "http://localhost:1317",
     chainID: chainID,
     gasAdjustment: 1.75,
@@ -221,7 +221,6 @@ async function instatiateAirdropNft(
     asset: {
       contract_addr: nft_contract,
     },
-
     public_key: PUBLICKEY,
     from_timestamp: from_timestamp,
     to_timestamp: to_timestamp,
@@ -335,32 +334,70 @@ async function increaseIncentives(
   console.log(res);
 }
 
+type Metadata = {
+  name: string;
+  description: string;
+  image: string;
+};
+
 type MintInfo = {
-  mint: {
-    token_id: string;
-    owner: string;
-    token_uri: string;
-  };
+  token_id: string;
+  owner: string;
+  token_uri: string;
+  metadata?: Metadata;
 };
 let offset = 0;
 function generateMintInfo(amount: number, receipient: string) {
-  let mint_info: string[] = [];
+  let mint_info: MintInfo[] = [];
   for (let i = offset; i < amount; i++) {
     let mint_info_obj: MintInfo = {
-      mint: {
-        token_id: i.toString(),
-        owner: receipient,
-        token_uri:
-          "https://ipfs.io/ipfs/QmeSjSinHpPnmXmspMjwiXyN6zS4E9zccariGR3jxcaWtq/" +
-          i.toString(),
-      },
+      token_id: i.toString(),
+      owner: receipient,
+      token_uri:
+        "https://ipfs.io/ipfs/QmeSjSinHpPnmXmspMjwiXyN6zS4E9zccariGR3jxcaWtq/" +
+        i.toString(),
     };
-    mint_info.push(
-      Buffer.from(JSON.stringify(mint_info_obj)).toString("base64")
-    );
+    mint_info.push(mint_info_obj);
   }
   offset += amount;
   return mint_info;
+}
+
+async function mintNfts(
+  wallet: Wallet,
+  nftContract: string,
+  airdropContract: string,
+  start: number,
+  end: number
+) {
+  const mint_info = generateMintInfo(end - start, airdropContract);
+  const mint_messages = mint_info.map((x) => {
+    return new MsgExecuteContract(
+      wallet.key.accAddress(prefix),
+      nftContract,
+      {
+        mint: x,
+      },
+      {}
+    );
+  });
+  const tx = await wallet
+    .createAndSignTx({
+      msgs: mint_messages,
+      chainID: chainID,
+    })
+    .catch((err) => {
+      console.log(err);
+      throw err;
+    });
+  console.log(tx);
+  console.log("----------------------------------");
+  const res = await terra.tx.broadcast(tx, chainID).catch((err) => {
+    console.log(err);
+    throw err;
+  });
+  console.log(res);
+  return res;
 }
 
 async function claim(
@@ -393,8 +430,8 @@ async function claim(
   let claim_payload = JSON.stringify({
     claim_amounts: amounts_string_array,
     signature: signature,
-    lootbox_info: lootbox_info,
-    mint_info: mint_info,
+    // lootbox_info: lootbox_info,
+    // mint_info: mint_info,
   });
   claim_payload = Buffer.from(claim_payload).toString("base64");
 
@@ -419,11 +456,7 @@ async function claim(
     });
   console.log(tx);
   console.log("----------------------------------");
-  const res = await terra.tx.broadcast(tx, chainID).catch((err) => {
-    console.log(err);
-    throw err;
-  });
-  console.log(res);
+  const res = await terra.tx.broadcast(tx, chainID);
   return res;
 }
 
@@ -538,42 +571,69 @@ async function testall() {
   console.log("DONE TESTING");
 }
 
+async function queryAirdrop(airdropContract: string) {
+  const res = await terra.wasm.contractQuery(airdropContract, {
+    status: {},
+  });
+  console.log(res);
+}
+
+async function queryNFT(airdropContract: string, nftContract: string) {
+  const res = await terra.wasm.contractQuery(nftContract, {
+    tokens: {
+      owner: airdropContract,
+    },
+  });
+  console.log(res);
+}
+
 async function testnft1(
   nft_contract: string,
   factoryContract: string,
   codes: number[]
 ) {
   const starttime = Math.trunc(Date.now() / 1000 + 10);
-  const endtime = Math.trunc(Date.now() / 1000 + 50);
+  const endtime = Math.trunc(Date.now() / 1000 + 40);
   let airdropContract = await instatiateAirdropNft(
     protocolWallet,
     codes[2],
     starttime,
     endtime,
-    [10, 100, 100],
+    [10, 7, 7],
     nft_contract
   );
 
-  console.log("Transfering NFT to airdrop contract");
-  await transferNftContract(protocolWallet, nft_contract, airdropContract);
+  // console.log("Transfering NFT to airdrop contract");
+  // await transferNftContract(protocolWallet, nft_contract, airdropContract);
+
+  console.log("Mass minting NFTs to airdrop contract");
+  await mintNfts(protocolWallet, nft_contract, airdropContract, 0, 24);
+  // await mintNfts(protocolWallet, nft_contract, airdropContract, 100, 200);
+  // await mintNfts(protocolWallet, nft_contract, airdropContract, 200, 300);
   console.log("Receiving NFT from airdrop contract");
-  await receiveNftContract(protocolWallet, airdropContract);
+  // await receiveNftContract(protocolWallet, airdropContract);
   console.log("Transfer Done.");
+  await queryNFT(airdropContract, nft_contract);
 
   await waitUntil(starttime);
+
+  // query airdrop contract to see if it is active
+
+  await queryAirdrop(airdropContract);
+  await queryNFT(airdropContract, nft_contract);
+
   await claim(userWallet, airdropContract, [2, 0, 0]);
   await wait(1500); // Wait a bit for wallet nonce to update.
   await claim(userWallet, airdropContract, [3, 0, 0]);
   await wait(1500);
   await claim(userWallet, airdropContract, [1, 0, 0])
     .then(throwErr)
-    .catch(expectError("Error is thrown for being unable to claim"));
+    .catch(expectError("Error is thrown for claim amount smaller"));
   await wait(1500);
   await claim(userWallet, airdropContract, [1, 0, 3])
     .then(throwErr)
-    .catch(expectError("Error is thrown for being unable to claim"));
+    .catch(expectError("Error is thrown for claim amount smaller"));
   await wait(1500);
-  // This should not error anymore
   await claim(userWallet, airdropContract, [3, 0, 0]);
   await wait(1500);
   await claim(protocolWallet, airdropContract, [5, 5, 5]);
@@ -583,6 +643,10 @@ async function testnft1(
   await claim(userWallet, airdropContract, [4, 0, 0]);
   await wait(1500);
   await claim(userWallet, airdropContract, [4, 0, 1]);
+
+  await queryNFT(userWallet.key.accAddress(prefix), nft_contract);
+  await queryNFT(protocolWallet.key.accAddress(prefix), nft_contract);
+  await queryNFT(hallwallet.key.accAddress(prefix), nft_contract);
 
   await waitUntil(endtime);
   return airdropContract;

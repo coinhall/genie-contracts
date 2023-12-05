@@ -1,4 +1,4 @@
-use cosmwasm_std::{Addr, Binary, Uint128};
+use cosmwasm_std::{Addr, Binary, Empty, Uint128};
 use cw_storage_plus::{Item, Map};
 use genie::{airdrop::LastClaimerInfo, asset::NftInfo};
 use schemars::JsonSchema;
@@ -41,3 +41,5 @@ pub const CONFIG: Item<Config> = Item::new("config");
 pub const STATE: Item<State> = Item::new("state");
 pub const USERS: Map<&Addr, UserInfo> = Map::new("users");
 pub const LAST_CLAIMER: Map<u64, LastClaimerInfo> = Map::new("last_claimer");
+
+pub const LIST_OF_IDS: Map<String, Empty> = Map::new("list_of_ids");

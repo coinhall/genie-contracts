@@ -11,6 +11,7 @@ pub struct InstantiateMsg {
     pub from_timestamp: u64,
     pub to_timestamp: u64,
     pub allocated_amounts: Vec<Uint128>,
+    pub start_id: Option<Uint128>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
@@ -33,8 +34,6 @@ pub enum Cw20HookMsg {
 pub struct ClaimNftPayload {
     pub claim_amounts: Vec<Uint128>,
     pub signature: Binary,
-    pub lootbox_info: Option<Vec<Uint128>>,
-    pub mint_info: Vec<Binary>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
@@ -45,7 +44,6 @@ pub enum QueryMsg {
     State {},
     UserInfo { address: String },
     HasUserClaimed { address: String },
-    UserLootboxInfo { address: String },
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
@@ -56,11 +54,6 @@ pub struct UserInfoResponse {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct ClaimResponse {
     pub has_claimed: bool,
-}
-
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
-pub struct UserLootboxInfoResponse {
-    pub claimed_lootbox: Vec<Uint128>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
@@ -80,16 +73,11 @@ pub struct StatusResponse {
 pub struct LastClaimerInfo {
     /// Assets claimed, per mission, by this account
     pub user_address: Addr,
-    /// If applicable to this campaign, lootboxes claimed, per mission, by this account
+    /// If applicable to this campaign, pending assets claimed, per mission, by this account
     pub pending_amount: Uint128,
 }
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct StateResponse {
     /// Unclaimed amount, per mission, currently in this contract
     pub unclaimed_amounts: Vec<Uint128>,
-}
-
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
-pub struct LootboxInfo {
-    pub claimed_lootbox: Binary,
 }
