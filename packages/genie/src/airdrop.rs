@@ -31,15 +31,6 @@ pub enum Cw20HookMsg {
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
-pub struct ClaimNftPayload {
-    pub claim_amounts: Vec<Uint128>,
-    pub signature: Binary,
-    pub lootbox_info: Option<Vec<Uint128>>,
-    pub nft_info: Vec<Binary>,
-}
-
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
-#[serde(rename_all = "snake_case")]
 pub struct ClaimPayload {
     pub claim_amounts: Vec<Uint128>,
     pub signature: Binary,

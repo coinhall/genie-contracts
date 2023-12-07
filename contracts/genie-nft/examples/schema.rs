@@ -3,8 +3,8 @@ use std::fs::create_dir_all;
 
 use cosmwasm_schema::{export_schema, remove_schemas, schema_for};
 
-use genie::airdrop::{Cw20HookMsg, ExecuteMsg, InstantiateMsg, QueryMsg};
-use genie_airdrop::state::{Config, UserInfo};
+use genie::airdrop_nft::{Cw20HookMsg, ExecuteMsg, InstantiateMsg, QueryMsg};
+use genie_nft::state::{Config, UserInfo};
 
 fn main() {
     let mut out_dir = current_dir().unwrap();

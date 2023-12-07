@@ -12,6 +12,16 @@
       "items": {
         "$ref": "#/definitions/Uint128"
       }
+    },
+    "claimed_lootbox": {
+      "description": "If applicable to this campaign, lootboxes claimed, per mission, by this account",
+      "type": [
+        "array",
+        "null"
+      ],
+      "items": {
+        "$ref": "#/definitions/Uint128"
+      }
     }
   },
   "definitions": {
