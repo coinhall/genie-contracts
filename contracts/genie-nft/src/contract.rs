@@ -4,11 +4,10 @@ use std::vec;
 use crate::crypto::is_valid_signature;
 use crate::state::{Config, State, CONFIG, LIST_OF_IDS, STATE, USERS};
 use cosmwasm_std::{
-    attr, entry_point, from_json, to_json_binary, Addr, Binary, CosmosMsg, Deps, DepsMut, Empty,
-    Env, MessageInfo, Response, StdError, StdResult, Uint128, WasmMsg,
+    attr, entry_point, from_json, to_json_binary, Addr, Binary, CosmosMsg, Deps, DepsMut, Env,
+    MessageInfo, Response, StdError, StdResult, Uint128, WasmMsg,
 };
 use cw2::set_contract_version;
-use cw_storage_plus::Bound;
 use genie::airdrop_nft::{
     ClaimNftPayload, ClaimResponse, ExecuteMsg, InstantiateMsg, QueryMsg, StateResponse, Status,
     StatusResponse, UserInfoResponse,
@@ -260,6 +259,14 @@ pub fn handle_claim(
         user_info.claimed_amounts = vec![Uint128::zero(); claim_amounts.len()];
     }
 
+    let mut last = state
+        .unclaimed_amounts
+        .clone()
+        .into_iter()
+        .sum::<Uint128>()
+        .u128()
+        - 1;
+
     for (i, amount) in claim_amounts.iter().enumerate() {
         if amount < &user_info.claimed_amounts[i] {
             return Err(StdError::generic_err(
@@ -296,34 +303,17 @@ pub fn handle_claim(
     let randomness: [u8; 16] = hash.to_vec()[0..16].try_into().unwrap();
     let mut rng = Xoshiro128PlusPlus::from_seed(randomness);
     let rngesus: &mut dyn rand::RngCore = &mut rng;
-    let rng_range = 0..config
-        .allocated_amounts
-        .clone()
-        .into_iter()
-        .sum::<Uint128>()
-        .u128();
 
     let mut nft_ids: Vec<String> = vec![];
     for _ in 0..claim_amount.u128() {
-        let random_number = rngesus.gen_range(rng_range.clone());
-        let mut item = LIST_OF_IDS
-            .range(
-                deps.storage,
-                Some(1u128).map(Bound::inclusive),
-                None,
-                cosmwasm_std::Order::Ascending,
-            )
-            .skip(random_number as usize)
-            .take(1)
-            .collect::<StdResult<Vec<(u128, String)>>>()?;
-        if item.is_empty() {
-            item = LIST_OF_IDS
-                .range(deps.storage, None, None, cosmwasm_std::Order::Ascending)
-                .take(1)
-                .collect::<StdResult<Vec<(u128, String)>>>()?;
-        }
-        let (index, id) = item.remove(0);
-        LIST_OF_IDS.remove(deps.storage, index);
+        let random_number = rngesus.gen_range(0..=last);
+        let id = LIST_OF_IDS
+            .load(deps.storage, random_number)
+            .unwrap_or_default();
+        let last_id = LIST_OF_IDS.load(deps.storage, last)?;
+        LIST_OF_IDS.save(deps.storage, random_number, &last_id)?;
+        LIST_OF_IDS.remove(deps.storage, last);
+        last = last.checked_sub(1).unwrap_or_default();
         nft_ids.push(id);
     }
 
@@ -332,10 +322,7 @@ pub fn handle_claim(
         .map(|nft_id| {
             let msg = CosmosMsg::Wasm(WasmMsg::Execute {
                 contract_addr: config.asset.contract_addr.to_string(),
-                msg: to_json_binary(&cw721_base::ExecuteMsg::<
-                    cw721_metadata_onchain::Extension,
-                    Empty,
-                >::TransferNft {
+                msg: to_json_binary(&cw721::Cw721ExecuteMsg::TransferNft {
                     recipient: recipient.to_string(),
                     token_id: nft_id,
                 })?,
