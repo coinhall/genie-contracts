@@ -37,7 +37,7 @@ const prefix = "terra";
 const FACTORY_CONTRACT = "genie-airdrop-factory";
 const GENIE_CONTRACT = "genie-airdrop";
 const GENIE_NFT_CONTRACT = "genie-nft";
-const NFT_CONTRACT = "cw721-metadata-onchain";
+const NFT_CONTRACT = "cw721-base";
 const contracts = [
   FACTORY_CONTRACT,
   GENIE_CONTRACT,
@@ -249,6 +249,9 @@ async function instatiateAirdropNft(
   console.log("----------------------------------");
   const res = await terra.tx.broadcast(tx, chainID);
   console.log(res);
+
+  // print out gas fees
+  const gasUsed = res.gas_used;
   const genieNftContract = res.logs[0].events
     .find((x) => x.type === "instantiate")
     ?.attributes.find((x) => x.key == "_contract_address")?.value;
@@ -344,7 +347,7 @@ type MintInfo = {
   token_id: string;
   owner: string;
   token_uri: string;
-  metadata?: Metadata;
+  extension?: Metadata;
 };
 let offset = 0;
 function generateMintInfo(amount: number, receipient: string) {
@@ -356,6 +359,13 @@ function generateMintInfo(amount: number, receipient: string) {
       token_uri:
         "https://ipfs.io/ipfs/QmeSjSinHpPnmXmspMjwiXyN6zS4E9zccariGR3jxcaWtq/" +
         i.toString(),
+      // extension: {
+      //   image:
+      //     "https://ipfs.io/ipfs/QmeSjSinHpPnmXmspMjwiXyN6zS4E9zccariGR3jxcaWtq/" +
+      //     i.toString(),
+      //   name: "NFT",
+      //   description: "NFT",
+      // },
     };
     mint_info.push(mint_info_obj);
   }

@@ -1,4 +1,5 @@
 use std::convert::TryInto;
+use std::vec;
 
 use crate::crypto::is_valid_signature;
 use crate::state::{Config, State, CONFIG, LIST_OF_IDS, STATE, USERS};
@@ -11,8 +12,10 @@ use genie::airdrop_nft::{
     ClaimNftPayload, ClaimResponse, ExecuteMsg, InstantiateMsg, QueryMsg, StateResponse, Status,
     StatusResponse, UserInfoResponse,
 };
+use rand_core::SeedableRng;
+use rand_xoshiro::Xoshiro128PlusPlus;
 use sha3::{Digest, Keccak256};
-// use cw_ownable::{Action, Ownership, OwnershipError};
+use shuffle::{fy::FisherYates, shuffler::Shuffler};
 
 const CONTRACT_NAME: &str = "genie-nft";
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -21,7 +24,7 @@ const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 pub fn instantiate(
     deps: DepsMut,
     env: Env,
-    _info: MessageInfo,
+    info: MessageInfo,
     msg: InstantiateMsg,
 ) -> StdResult<Response> {
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
@@ -61,13 +64,41 @@ pub fn instantiate(
 
     // create a list of ids and store it in LIST_OF_IDS
     let end_id = msg.allocated_amounts.iter().sum::<Uint128>();
+    let mut vec_of_ids: Vec<String> = vec![];
 
     for i in 0..end_id.u128() {
         let id = i.to_string();
-        LIST_OF_IDS.save(deps.storage, id.to_string(), &Empty {})?;
+        vec_of_ids.push(id);
+    }
+
+    let seed_string = format!(
+        "{},{},{},{},{}",
+        config.asset.contract_addr.to_string(),
+        info.sender.to_string(),
+        env.block.time.nanos(),
+        0,
+        // env.transaction.expect("expect transaction id").index,
+        env.block.height
+    );
+    let randomized_ids = shuffle_vector(seed_string, vec_of_ids)?;
+
+    for (i, id) in randomized_ids.iter().enumerate() {
+        LIST_OF_IDS.save(deps.storage, i as u128, id)?;
     }
 
     Ok(Response::default())
+}
+
+fn shuffle_vector(seed: String, mut vector: Vec<String>) -> StdResult<Vec<String>> {
+    let hash = Keccak256::digest(seed.as_bytes());
+    let randomness: [u8; 16] = hash.to_vec()[0..16].try_into().unwrap();
+    let mut rng = Xoshiro128PlusPlus::from_seed(randomness);
+    let mut shuffler = FisherYates::default();
+    shuffler
+        .shuffle(&mut vector, &mut rng)
+        .map_err(StdError::generic_err)?;
+
+    Ok(vector)
 }
 
 #[cfg_attr(not(feature = "library"), entry_point)]
@@ -183,45 +214,6 @@ pub fn handle_increase_incentives(
     Ok(Response::new().add_attribute("action", "increase_incentives"))
 }
 
-// Test using this for now, change it later.
-pub fn generate_nft_ids_indexes(
-    deps: DepsMut,
-    msg: String,
-    amount_to_generate: Uint128,
-    max_index: Uint128,
-) -> Result<Vec<String>, StdError> {
-    // let msg_buf = msg.as_bytes();
-    // let keccak_digest = Keccak256::digest(msg_buf);
-    // let hash: &[u8] = keccak_digest.as_slice();
-    // let max_index: u128 = max_index.into();
-
-    // // hash modulo max_index to get 1 index
-    // let mut index: u128 = u128::from_le_bytes([
-    //     hash[0], hash[1], hash[2], hash[3], hash[4], hash[5], hash[6], hash[7], hash[8], hash[9],
-    //     hash[10], hash[11], hash[12], hash[13], hash[14], hash[15],
-    // ]) % max_index;
-
-    // // range from index to index + amount_to_generate
-    // let mut indexes: Vec<u128> = vec![];
-    // for _ in 0..amount_to_generate.into() {
-    //     indexes.push(index);
-    //     index += 1;
-    //     if index >= max_index {
-    //         index = 0;
-    //     }
-    // }
-    let amount: usize = amount_to_generate.u128().try_into().unwrap();
-
-    LIST_OF_IDS
-        .range(deps.storage, None, None, cosmwasm_std::Order::Ascending)
-        .take(amount)
-        .map(|item| {
-            let (key, _) = item?;
-            Ok(key)
-        })
-        .collect::<StdResult<Vec<String>>>()
-}
-
 pub fn handle_claim(
     deps: DepsMut,
     env: Env,
@@ -295,38 +287,28 @@ pub fn handle_claim(
     // Transfer assets to the recipient
     let config = &CONFIG.load(deps.storage)?;
 
-    // let seed_string = format!(
-    //     "{},{},{},{},{}",
-    //     config.asset.contract_addr.to_string(),
-    //     recipient.to_string(),
-    //     env.block.time.nanos(),
-    //     0,
-    //     // env.transaction.expect("expect transaction id").index,
-    //     env.block.height
-    // );
-
     let nft_ids = LIST_OF_IDS
         .range(deps.storage, None, None, cosmwasm_std::Order::Ascending)
         .take(claim_amount.u128().try_into().unwrap())
-        .map(|item| {
-            let (key, _) = item?;
-            Ok(key)
-        })
-        .collect::<StdResult<Vec<String>>>()?;
+        .collect::<StdResult<Vec<(u128, String)>>>()?;
 
     // for each nft_id used up, remove from the map
     for nft_id in nft_ids.iter() {
-        LIST_OF_IDS.remove(deps.storage, nft_id.to_string());
+        LIST_OF_IDS.remove(deps.storage, nft_id.0);
     }
 
+    // let messages: Vec<CosmosMsg> = vec![];
     let messages = nft_ids
         .into_iter()
         .map(|nft_id| {
             let msg = CosmosMsg::Wasm(WasmMsg::Execute {
                 contract_addr: config.asset.contract_addr.to_string(),
-                msg: to_json_binary(&cw721::Cw721ExecuteMsg::TransferNft {
+                msg: to_json_binary(&cw721_base::ExecuteMsg::<
+                    cw721_metadata_onchain::Extension,
+                    Empty,
+                >::TransferNft {
                     recipient: recipient.to_string(),
-                    token_id: nft_id.to_string(),
+                    token_id: nft_id.1,
                 })?,
                 funds: vec![],
             });
@@ -397,7 +379,7 @@ fn query_status(deps: Deps, env: &Env) -> StdResult<StatusResponse> {
     let config = CONFIG.load(deps.storage)?;
     let users_is_empty = USERS.is_empty(deps.storage);
 
-    // check ownership by abusing pagination
+    // check ownership by using pagination
     // query cw721 for tokens owned by this contract
 
     let page = 1;
@@ -412,7 +394,7 @@ fn query_status(deps: Deps, env: &Env) -> StdResult<StatusResponse> {
     );
 
     let has_token = match tokens {
-        Ok(tokens) => tokens.tokens.len() > 0,
+        Ok(tokens) => !tokens.tokens.is_empty(),
         _ => false,
     };
 
