@@ -8,10 +8,12 @@ use cosmwasm_std::{
     Env, MessageInfo, Response, StdError, StdResult, Uint128, WasmMsg,
 };
 use cw2::set_contract_version;
+use cw_storage_plus::Bound;
 use genie::airdrop_nft::{
     ClaimNftPayload, ClaimResponse, ExecuteMsg, InstantiateMsg, QueryMsg, StateResponse, Status,
     StatusResponse, UserInfoResponse,
 };
+use rand::Rng;
 use rand_core::SeedableRng;
 use rand_xoshiro::Xoshiro128PlusPlus;
 use sha3::{Digest, Keccak256};
@@ -72,12 +74,10 @@ pub fn instantiate(
     }
 
     let seed_string = format!(
-        "{},{},{},{},{}",
+        "{},{},{},{}",
         config.asset.contract_addr.to_string(),
         info.sender.to_string(),
         env.block.time.nanos(),
-        0,
-        // env.transaction.expect("expect transaction id").index,
         env.block.height
     );
     let randomized_ids = shuffle_vector(seed_string, vec_of_ids)?;
@@ -260,8 +260,6 @@ pub fn handle_claim(
         user_info.claimed_amounts = vec![Uint128::zero(); claim_amounts.len()];
     }
 
-    // let nfts_owned = state.unclaimed_amounts.iter().sum();
-
     for (i, amount) in claim_amounts.iter().enumerate() {
         if amount < &user_info.claimed_amounts[i] {
             return Err(StdError::generic_err(
@@ -287,17 +285,48 @@ pub fn handle_claim(
     // Transfer assets to the recipient
     let config = &CONFIG.load(deps.storage)?;
 
-    let nft_ids = LIST_OF_IDS
-        .range(deps.storage, None, None, cosmwasm_std::Order::Ascending)
-        .take(claim_amount.u128().try_into().unwrap())
-        .collect::<StdResult<Vec<(u128, String)>>>()?;
+    let seed_string = format!(
+        "{},{},{},{}",
+        config.asset.contract_addr.to_string(),
+        info.sender.to_string(),
+        env.block.time.nanos(),
+        env.block.height
+    );
+    let hash = Keccak256::digest(seed_string.as_bytes());
+    let randomness: [u8; 16] = hash.to_vec()[0..16].try_into().unwrap();
+    let mut rng = Xoshiro128PlusPlus::from_seed(randomness);
+    let rngesus: &mut dyn rand::RngCore = &mut rng;
+    let rng_range = 0..config
+        .allocated_amounts
+        .clone()
+        .into_iter()
+        .sum::<Uint128>()
+        .u128();
 
-    // for each nft_id used up, remove from the map
-    for nft_id in nft_ids.iter() {
-        LIST_OF_IDS.remove(deps.storage, nft_id.0);
+    let mut nft_ids: Vec<String> = vec![];
+    for _ in 0..claim_amount.u128() {
+        let random_number = rngesus.gen_range(rng_range.clone());
+        let mut item = LIST_OF_IDS
+            .range(
+                deps.storage,
+                Some(1u128).map(Bound::inclusive),
+                None,
+                cosmwasm_std::Order::Ascending,
+            )
+            .skip(random_number as usize)
+            .take(1)
+            .collect::<StdResult<Vec<(u128, String)>>>()?;
+        if item.is_empty() {
+            item = LIST_OF_IDS
+                .range(deps.storage, None, None, cosmwasm_std::Order::Ascending)
+                .take(1)
+                .collect::<StdResult<Vec<(u128, String)>>>()?;
+        }
+        let (index, id) = item.remove(0);
+        LIST_OF_IDS.remove(deps.storage, index);
+        nft_ids.push(id);
     }
 
-    // let messages: Vec<CosmosMsg> = vec![];
     let messages = nft_ids
         .into_iter()
         .map(|nft_id| {
@@ -308,7 +337,7 @@ pub fn handle_claim(
                     Empty,
                 >::TransferNft {
                     recipient: recipient.to_string(),
-                    token_id: nft_id.1,
+                    token_id: nft_id,
                 })?,
                 funds: vec![],
             });

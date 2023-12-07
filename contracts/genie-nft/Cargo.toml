@@ -54,6 +54,8 @@ cw-ownable = "0.5.1"
 shuffle = { git = "https://github.com/webmaster128/shuffle", branch = "rm-getrandom", version = "0.1.7" }
 rand_core = { version = "0.6.4", default-features = false }
 rand_xoshiro = { version = "0.6.0", default-features = false }
+rand = { version = "0.8.4", default-features = false }
+
 
 [dev-dependencies]
 cosmwasm-schema = { version = "1.0.0" }
