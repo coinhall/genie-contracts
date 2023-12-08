@@ -592,6 +592,7 @@ async function queryNFT(airdropContract: string, nftContract: string) {
   const res = await terra.wasm.contractQuery(nftContract, {
     tokens: {
       owner: airdropContract,
+      limit: 30,
     },
   });
   console.log(res);
@@ -618,8 +619,7 @@ async function testnft1(
 
   console.log("Mass minting NFTs to airdrop contract");
   await mintNfts(protocolWallet, nft_contract, airdropContract, 0, 24);
-  // await mintNfts(protocolWallet, nft_contract, airdropContract, 100, 200);
-  // await mintNfts(protocolWallet, nft_contract, airdropContract, 200, 300);
+
   console.log("Receiving NFT from airdrop contract");
   // await receiveNftContract(protocolWallet, airdropContract);
   console.log("Transfer Done.");
@@ -652,11 +652,13 @@ async function testnft1(
   await wait(1500);
   await claim(userWallet, airdropContract, [4, 0, 0]);
   await wait(1500);
-  await claim(userWallet, airdropContract, [4, 0, 1]);
+  await claim(userWallet, airdropContract, [140, 100, 101]);
+  await claim(userWallet, airdropContract, [140, 100, 101]);
 
   await queryNFT(userWallet.key.accAddress(prefix), nft_contract);
   await queryNFT(protocolWallet.key.accAddress(prefix), nft_contract);
   await queryNFT(hallwallet.key.accAddress(prefix), nft_contract);
+  await queryNFT(airdropContract, nft_contract);
 
   await waitUntil(endtime);
   return airdropContract;

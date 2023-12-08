@@ -264,8 +264,9 @@ pub fn handle_claim(
         .clone()
         .into_iter()
         .sum::<Uint128>()
-        .u128()
-        - 1;
+        .checked_sub(Uint128::from(1u128))
+        .unwrap_or_default()
+        .u128();
 
     for (i, amount) in claim_amounts.iter().enumerate() {
         if amount < &user_info.claimed_amounts[i] {
