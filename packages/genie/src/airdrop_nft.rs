@@ -11,7 +11,6 @@ pub struct InstantiateMsg {
     pub from_timestamp: u64,
     pub to_timestamp: u64,
     pub allocated_amounts: Vec<Uint128>,
-    pub start_id: Option<Uint128>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
