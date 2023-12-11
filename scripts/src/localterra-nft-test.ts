@@ -11,7 +11,6 @@ import * as fs from "fs";
 import * as path from "path";
 import * as secp256k1 from "secp256k1";
 import keccak256 from "keccak256";
-import exp from "constants";
 
 console.log("Example usage: yarn start src/localterra-nft-test.ts --m1");
 
@@ -352,20 +351,20 @@ type MintInfo = {
 let offset = 0;
 function generateMintInfo(amount: number, receipient: string) {
   let mint_info: MintInfo[] = [];
-  for (let i = offset; i < amount; i++) {
+  for (let i = offset; i < offset + amount; i++) {
     let mint_info_obj: MintInfo = {
       token_id: i.toString(),
       owner: receipient,
       token_uri:
         "https://ipfs.io/ipfs/QmeSjSinHpPnmXmspMjwiXyN6zS4E9zccariGR3jxcaWtq/" +
         i.toString(),
-      // extension: {
-      //   image:
-      //     "https://ipfs.io/ipfs/QmeSjSinHpPnmXmspMjwiXyN6zS4E9zccariGR3jxcaWtq/" +
-      //     i.toString(),
-      //   name: "NFT",
-      //   description: "NFT",
-      // },
+      extension: {
+        image:
+          "https://ipfs.io/ipfs/QmeSjSinHpPnmXmspMjwiXyN6zS4E9zccariGR3jxcaWtq/" +
+          i.toString(),
+        name: "NFT",
+        description: "NFT",
+      },
     };
     mint_info.push(mint_info_obj);
   }
@@ -380,34 +379,37 @@ async function mintNfts(
   start: number,
   end: number
 ) {
-  const mint_info = generateMintInfo(end - start, airdropContract);
-  const mint_messages = mint_info.map((x) => {
-    return new MsgExecuteContract(
-      wallet.key.accAddress(prefix),
-      nftContract,
-      {
-        mint: x,
-      },
-      {}
-    );
-  });
-  const tx = await wallet
-    .createAndSignTx({
-      msgs: mint_messages,
-      chainID: chainID,
-    })
-    .catch((err) => {
+  // batch start, end by 100 at a time
+  for (let i = start; i < end; i += 100) {
+    const mint_info = generateMintInfo(100, airdropContract);
+    const mint_messages = mint_info.map((x) => {
+      return new MsgExecuteContract(
+        wallet.key.accAddress(prefix),
+        nftContract,
+        {
+          mint: x,
+        },
+        {}
+      );
+    });
+    const tx = await wallet
+      .createAndSignTx({
+        msgs: mint_messages,
+        chainID: chainID,
+      })
+      .catch((err) => {
+        console.log(err);
+        throw err;
+      });
+    console.log(tx);
+    console.log("----------------------------------");
+    const res = await terra.tx.broadcast(tx, chainID).catch((err) => {
       console.log(err);
       throw err;
     });
-  console.log(tx);
-  console.log("----------------------------------");
-  const res = await terra.tx.broadcast(tx, chainID).catch((err) => {
-    console.log(err);
-    throw err;
-  });
-  console.log(res);
-  return res;
+    console.log(res);
+  }
+  return;
 }
 
 async function claim(
@@ -416,8 +418,6 @@ async function claim(
   amounts: number[]
 ) {
   const account = wallet.key.accAddress(prefix);
-  const amountToMint = amounts.reduce((a, b) => a + b, 0);
-  const mint_info = generateMintInfo(amountToMint, account);
 
   const private_key = Buffer.from(PRIVATEKEY ?? "", "base64");
   const claimsContract = airdropContract;
@@ -440,8 +440,6 @@ async function claim(
   let claim_payload = JSON.stringify({
     claim_amounts: amounts_string_array,
     signature: signature,
-    // lootbox_info: lootbox_info,
-    // mint_info: mint_info,
   });
   claim_payload = Buffer.from(claim_payload).toString("base64");
 
@@ -470,66 +468,6 @@ async function claim(
   return res;
 }
 
-async function transferNftContract(
-  wallet: Wallet,
-  nftContract: string,
-  airdropContract: string
-) {
-  const transferNft = new MsgExecuteContract(
-    wallet.key.accAddress(prefix),
-    nftContract,
-    {
-      update_ownership: {
-        transfer_ownership: {
-          new_owner: airdropContract,
-          expiry: {
-            never: {},
-          },
-        },
-      },
-    },
-    {}
-  );
-  const tx = await wallet
-    .createAndSignTx({
-      msgs: [transferNft],
-      chainID: chainID,
-    })
-    .catch((err) => {
-      console.log(err);
-      throw err;
-    });
-  console.log(tx);
-  console.log("----------------------------------");
-  const res = await terra.tx.broadcast(tx, chainID).catch((err) => {
-    console.log(err);
-    throw err;
-  });
-  console.log(res);
-}
-async function receiveNftContract(wallet: Wallet, airdropContract: string) {
-  const receiveNft = new MsgExecuteContract(
-    wallet.key.accAddress(prefix),
-    airdropContract,
-    {
-      receive_ownership: {},
-    },
-    {}
-  );
-  const tx = await wallet
-    .createAndSignTx({
-      msgs: [receiveNft],
-      chainID: chainID,
-    })
-    .catch((err) => {
-      console.log(err);
-      throw err;
-    });
-  console.log(tx);
-  console.log("----------------------------------");
-  const res = await terra.tx.broadcast(tx, chainID);
-  console.log(res);
-}
 async function wait(ms: number) {
   if (chainID === "localterra") {
     return;
@@ -592,9 +530,35 @@ async function queryNFT(airdropContract: string, nftContract: string) {
   const res = await terra.wasm.contractQuery(nftContract, {
     tokens: {
       owner: airdropContract,
-      limit: 30,
+      limit: 200,
     },
   });
+  console.log(res);
+}
+
+async function transferUnclaimedTokens(
+  wallet: Wallet,
+  airdropContract: string
+) {
+  const transferUnclaimedTokens = new MsgExecuteContract(
+    wallet.key.accAddress(prefix),
+    airdropContract,
+    {
+      transfer_unclaimed_tokens: {
+        recipient: wallet.key.accAddress(prefix),
+        limit: 60,
+        start_after: "100",
+      },
+    },
+    {}
+  );
+  const tx = await wallet.createAndSignTx({
+    msgs: [transferUnclaimedTokens],
+    chainID: chainID,
+  });
+  console.log(tx);
+  console.log("----------------------------------");
+  const res = await terra.tx.broadcast(tx, chainID);
   console.log(res);
 }
 
@@ -603,14 +567,14 @@ async function testnft1(
   factoryContract: string,
   codes: number[]
 ) {
-  const starttime = Math.trunc(Date.now() / 1000 + 10);
-  const endtime = Math.trunc(Date.now() / 1000 + 40);
+  const starttime = Math.trunc(Date.now() / 1000 + 60);
+  const endtime = Math.trunc(Date.now() / 1000 + 100);
   let airdropContract = await instatiateAirdropNft(
     protocolWallet,
     codes[2],
     starttime,
     endtime,
-    [10, 7, 7],
+    [200, 100, 100],
     nft_contract
   );
 
@@ -618,7 +582,7 @@ async function testnft1(
   // await transferNftContract(protocolWallet, nft_contract, airdropContract);
 
   console.log("Mass minting NFTs to airdrop contract");
-  await mintNfts(protocolWallet, nft_contract, airdropContract, 0, 24);
+  await mintNfts(protocolWallet, nft_contract, airdropContract, 0, 400);
 
   console.log("Receiving NFT from airdrop contract");
   // await receiveNftContract(protocolWallet, airdropContract);
@@ -652,8 +616,8 @@ async function testnft1(
   await wait(1500);
   await claim(userWallet, airdropContract, [4, 0, 0]);
   await wait(1500);
-  await claim(userWallet, airdropContract, [140, 100, 101]);
-  await claim(userWallet, airdropContract, [140, 100, 101]);
+  await claim(userWallet, airdropContract, [10, 10, 10]);
+  await claim(userWallet, airdropContract, [20, 20, 20]);
 
   await queryNFT(userWallet.key.accAddress(prefix), nft_contract);
   await queryNFT(protocolWallet.key.accAddress(prefix), nft_contract);
@@ -661,5 +625,18 @@ async function testnft1(
   await queryNFT(airdropContract, nft_contract);
 
   await waitUntil(endtime);
+
+  await transferUnclaimedTokens(protocolWallet, airdropContract);
+  await transferUnclaimedTokens(protocolWallet, airdropContract);
+  await transferUnclaimedTokens(protocolWallet, airdropContract);
+  await transferUnclaimedTokens(protocolWallet, airdropContract);
+  await transferUnclaimedTokens(protocolWallet, airdropContract);
+  await transferUnclaimedTokens(protocolWallet, airdropContract);
+
+  await queryNFT(userWallet.key.accAddress(prefix), nft_contract);
+  await queryNFT(protocolWallet.key.accAddress(prefix), nft_contract);
+  await queryNFT(hallwallet.key.accAddress(prefix), nft_contract);
+  await queryNFT(airdropContract, nft_contract);
+
   return airdropContract;
 }

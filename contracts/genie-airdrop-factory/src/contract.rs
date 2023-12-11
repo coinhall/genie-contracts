@@ -1,7 +1,7 @@
 use crate::crypto::check_secp256k1_public_key;
 use crate::state::{Config, CAMPAIGN_ID_MAP, CONFIG};
 use cosmwasm_std::{
-    attr, entry_point, to_binary, Binary, CosmosMsg, Deps, DepsMut, Empty, Env, MessageInfo,
+    attr, entry_point, to_json_binary, Binary, CosmosMsg, Deps, DepsMut, Empty, Env, MessageInfo,
     Response, StdError, StdResult, Uint128, WasmMsg,
 };
 use cw2::set_contract_version;
@@ -116,7 +116,7 @@ pub fn execute_create_airdrop(
     }
     // update the campaign id map
     CAMPAIGN_ID_MAP.save(deps.storage, campaign_id.clone(), &Empty {})?;
-  
+
     if allocated_amounts.len() > 5 {
         return Err(StdError::generic_err("too many allocation amounts"));
     }
@@ -131,7 +131,7 @@ pub fn execute_create_airdrop(
             funds: vec![],
             admin: None,
             label: String::from("Genie Campaign"),
-            msg: to_binary(&AirdropInstantiateMsg {
+            msg: to_json_binary(&AirdropInstantiateMsg {
                 owner: info.sender.to_string(),
                 asset: asset_info,
                 from_timestamp,
@@ -145,9 +145,9 @@ pub fn execute_create_airdrop(
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
-        QueryMsg::Config {} => to_binary(&query_config(deps)?),
+        QueryMsg::Config {} => to_json_binary(&query_config(deps)?),
         QueryMsg::CampaignStatuses { addresses } => {
-            to_binary(&query_campaign_statuses(deps, addresses)?)
+            to_json_binary(&query_campaign_statuses(deps, addresses)?)
         }
     }
 }

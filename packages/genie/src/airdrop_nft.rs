@@ -17,10 +17,17 @@ pub struct InstantiateMsg {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum ExecuteMsg {
-    Claim { payload: Binary },
-    IncreaseIncentives { topup_amounts: Option<Vec<Uint128>> },
-    ReturnOwnership { recipient: Addr },
-    ReceiveOwnership {},
+    Claim {
+        payload: Binary,
+    },
+    IncreaseIncentives {
+        topup_amounts: Option<Vec<Uint128>>,
+    },
+    TransferUnclaimedTokens {
+        recipient: String,
+        start_after: Option<String>,
+        limit: Option<u32>,
+    },
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]

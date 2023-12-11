@@ -4,7 +4,7 @@ use std::vec;
 use crate::crypto::is_valid_signature;
 use crate::state::{Config, State, CONFIG, LIST_OF_IDS, STATE, USERS};
 use cosmwasm_std::{
-    attr, entry_point, from_json, to_json_binary, Addr, Binary, CosmosMsg, Deps, DepsMut, Env,
+    attr, entry_point, from_json, to_json_binary, Binary, CosmosMsg, Deps, DepsMut, Env,
     MessageInfo, Response, StdError, StdResult, Uint128, WasmMsg,
 };
 use cw2::set_contract_version;
@@ -109,13 +109,14 @@ pub fn execute(
 ) -> Result<Response, StdError> {
     match msg {
         ExecuteMsg::Claim { payload } => handle_claim(deps, env, info, payload),
-        ExecuteMsg::ReturnOwnership { recipient } => {
-            handle_transfer_ownership(deps, env, info, recipient)
-        }
         ExecuteMsg::IncreaseIncentives { topup_amounts } => {
             handle_increase_incentives(deps, env, info, topup_amounts)
         }
-        ExecuteMsg::ReceiveOwnership {} => handle_receive_ownership(deps, env, info),
+        ExecuteMsg::TransferUnclaimedTokens {
+            recipient,
+            start_after,
+            limit,
+        } => handle_transfer_unclaimed_tokens(deps, env, info, recipient, start_after, limit),
     }
 }
 
@@ -130,56 +131,6 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> StdResult<Binary> {
         QueryMsg::UserInfo { address } => to_json_binary(&query_user_info(deps, address)?),
         QueryMsg::Status {} => to_json_binary(&query_status(deps, &env)?),
     }
-}
-
-pub fn handle_receive_ownership(
-    deps: DepsMut,
-    _env: Env,
-    info: MessageInfo,
-) -> Result<Response, StdError> {
-    let config = CONFIG.load(deps.storage)?;
-    if info.sender != config.owner {
-        return Err(StdError::generic_err("unauthorized"));
-    }
-
-    let messages = vec![CosmosMsg::Wasm(WasmMsg::Execute {
-        contract_addr: config.asset.contract_addr.to_string(),
-        msg: to_json_binary(&cw_ownable::Action::AcceptOwnership {})?,
-        funds: vec![],
-    })];
-
-    Result::Ok(
-        Response::new()
-            .add_attribute("action", "receive_ownership")
-            .add_messages(messages),
-    )
-}
-
-pub fn handle_transfer_ownership(
-    deps: DepsMut,
-    _env: Env,
-    info: MessageInfo,
-    recipient: Addr,
-) -> Result<Response, StdError> {
-    let config = CONFIG.load(deps.storage)?;
-    if info.sender != config.owner {
-        return Err(StdError::generic_err("unauthorized"));
-    }
-
-    let messages = vec![CosmosMsg::Wasm(WasmMsg::Execute {
-        contract_addr: config.asset.contract_addr.to_string(),
-        msg: to_json_binary(&cw_ownable::Action::TransferOwnership {
-            new_owner: recipient.to_string(),
-            expiry: None,
-        })?,
-        funds: vec![],
-    })];
-
-    Result::Ok(
-        Response::new()
-            .add_attribute("action", "return_ownership")
-            .add_messages(messages),
-    )
 }
 
 pub fn handle_increase_incentives(
@@ -361,6 +312,56 @@ pub fn handle_claim(
     Ok(Response::new()
         .add_messages(messages)
         .add_attributes(attributes))
+}
+
+pub fn handle_transfer_unclaimed_tokens(
+    deps: DepsMut,
+    env: Env,
+    info: MessageInfo,
+    recipient: String,
+    start_after: Option<String>,
+    limit: Option<u32>,
+) -> Result<Response, StdError> {
+    let config = CONFIG.load(deps.storage)?;
+    if info.sender != config.owner {
+        return Err(StdError::generic_err("unauthorized"));
+    }
+    let status = query_status(deps.as_ref(), &env)?.status;
+    if status == Status::Ongoing {
+        return Err(StdError::generic_err(
+            "campaign is ongoing and transfer_unclaimed_tokens is not",
+        ));
+    }
+
+    // query NFT contract for all tokens owned by this contract
+    let ids_to_return: cw721::TokensResponse = deps.querier.query_wasm_smart(
+        &config.asset.contract_addr,
+        &cw721::Cw721QueryMsg::Tokens {
+            owner: env.contract.address.to_string(),
+            start_after: start_after,
+            limit: limit,
+        },
+    )?;
+
+    let messages = ids_to_return
+        .tokens
+        .into_iter()
+        .map(|id| {
+            let msg = CosmosMsg::Wasm(WasmMsg::Execute {
+                contract_addr: config.asset.contract_addr.to_string(),
+                msg: to_json_binary(&cw721::Cw721ExecuteMsg::TransferNft {
+                    recipient: recipient.to_string(),
+                    token_id: id,
+                })?,
+                funds: vec![],
+            });
+            Ok(msg)
+        })
+        .collect::<StdResult<Vec<CosmosMsg>>>()?;
+
+    return Ok(Response::new()
+        .add_messages(messages)
+        .add_attribute("action", "transfer_unclaimed_tokens"));
 }
 
 fn query_state(deps: Deps, _env: Env) -> StdResult<StateResponse> {
