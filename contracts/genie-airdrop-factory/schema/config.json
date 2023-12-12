@@ -3,16 +3,10 @@
   "title": "Config",
   "type": "object",
   "required": [
-    "airdrop_code_id",
     "owner",
     "public_key"
   ],
   "properties": {
-    "airdrop_code_id": {
-      "type": "integer",
-      "format": "uint64",
-      "minimum": 0.0
-    },
     "owner": {
       "$ref": "#/definitions/Addr"
     },

@@ -17,11 +17,6 @@ console.log("Example usage: yarn start src/test.ts --m1");
 const IS_M1 = process.argv[2] === "--m1";
 const M1_MODIFIER = IS_M1 ? "-aarch64" : "";
 
-// const SEED_PHRASE = process.env.SEED_PHRASE;
-// const PROTOCOL_PHRASE = process.env.PROTOCOL_PHRASE;
-// const USER_PHRASE = process.env.USER_PHRASE;
-// const PUBLICKEY = process.env.PUBLICKEY;
-// const PRIVATEKEY = process.env.PRIVATEKEY;
 const SEED_PHRASE =
   "satisfy adjust timber high purchase tuition stool faith fine install that you unaware feed domain license impose boss human eager hat rent enjoy dawn";
 const PROTOCOL_PHRASE =
@@ -36,14 +31,8 @@ const prefix = "terra";
 
 const FACTORY_CONTRACT = "genie-airdrop-factory";
 const CONTRACT = "genie-airdrop";
+const CW20 = "cw20-base";
 
-const TOKEN_CONTRACT =
-  "terra1hm4y6fzgxgu688jgf7ek66px6xkrtmn3gyk8fax3eawhp68c2d5q74k9fw";
-const asset_info = {
-  token: {
-    contract_addr: TOKEN_CONTRACT,
-  },
-};
 const asset_info_luna = {
   native_token: {
     denom: "uluna",
@@ -113,6 +102,77 @@ const file = fs.readFileSync(
     CONTRACT.replace(/-/g, "_") + M1_MODIFIER + ".wasm"
   )
 );
+const cw20File = fs.readFileSync(
+  path.resolve(
+    __dirname,
+    "..",
+    "..",
+    "artifacts",
+    CW20.replace(/-/g, "_") + M1_MODIFIER + ".wasm"
+  )
+);
+
+async function setupCW20(wallet: Wallet) {
+  const upload = new MsgStoreCode(
+    wallet.key.accAddress(prefix),
+    Buffer.from(cw20File).toString("base64")
+  );
+  const tx = await wallet.createAndSignTx({
+    msgs: [upload],
+    chainID: chainID,
+  });
+  console.log(tx);
+  console.log("----------------------------------");
+  const res = await terra.tx.broadcast(tx, chainID);
+  console.log(res);
+  const code = parseInt(
+    res.logs[0].events
+      .find((x) => x.type === "store_code")
+      ?.attributes.find((x) => x.key == "code_id")?.value ?? "0"
+  );
+  console.log("code", code);
+
+  const initMsg = {
+    name: "Astro",
+    symbol: "ASTRO",
+    decimals: 6,
+    initial_balances: [
+      {
+        address: wallet.key.accAddress(prefix),
+        amount: "1000000000000",
+      },
+    ],
+    mint: {
+      minter: wallet.key.accAddress(prefix),
+      cap: "1000000000000",
+    },
+  };
+
+  const instantiate = new MsgInstantiateContract(
+    wallet.key.accAddress(prefix),
+    undefined,
+    code,
+    initMsg,
+    {},
+    "astro"
+  );
+
+  const tx2 = await wallet.createAndSignTx({
+    msgs: [instantiate],
+    chainID: chainID,
+  });
+  console.log(tx2);
+  console.log("----------------------------------");
+  const res2 = await terra.tx.broadcast(tx2, chainID);
+  console.log(res2);
+  const cw20Contract =
+    res2.logs[0].events
+      .find((x) => x.type === "instantiate")
+      ?.attributes.find((x) => x.key == "_contract_address")?.value ?? "";
+  console.log("cw20Contract", cw20Contract);
+
+  return cw20Contract;
+}
 async function uploadContract(wallet: Wallet) {
   const uploadFactory = new MsgStoreCode(
     wallet.key.accAddress(prefix),
@@ -132,8 +192,16 @@ async function uploadContract(wallet: Wallet) {
   console.log("----------------------------------");
   const res = await terra.tx.broadcast(tx, chainID);
   console.log(res);
-  const factoryCode = parseInt(res.logs[0].events[1].attributes[1].value);
-  const contractCode = parseInt(res.logs[1].events[1].attributes[1].value);
+  const factoryCode = parseInt(
+    res.logs[0].events
+      .find((x) => x.type === "store_code")
+      ?.attributes.find((x) => x.key == "code_id")?.value ?? "0"
+  );
+  const contractCode = parseInt(
+    res.logs[1].events
+      .find((x) => x.type === "store_code")
+      ?.attributes.find((x) => x.key == "code_id")?.value ?? "0"
+  );
   console.log("factoryCode", factoryCode);
   console.log("contractCode", contractCode);
   return [factoryCode, contractCode];
@@ -162,9 +230,41 @@ async function instantiateFactory(
   console.log("----------------------------------");
   const res = await terra.tx.broadcast(tx, chainID);
   console.log(res);
-  const factoryContract = res.logs[0].events[0].attributes[0].value;
+  const factoryContract =
+    res.logs[0].events
+      .find((x) => x.type === "instantiate")
+      ?.attributes.find((x) => x.key == "_contract_address")?.value ?? "";
   console.log("factoryContract", factoryContract);
   return factoryContract;
+}
+async function updateAirdropConfig(
+  wallet: Wallet,
+  factoryContract: string,
+  contractCode: number
+) {
+  const updateConfig = new MsgExecuteContract(
+    wallet.key.accAddress(prefix),
+    factoryContract,
+    {
+      update_airdrop_config: {
+        config: {
+          airdrop_type: "asset",
+          code_id: contractCode,
+          is_disabled: false,
+        },
+      },
+    },
+    {}
+  );
+
+  const tx = await wallet.createAndSignTx({
+    msgs: [updateConfig],
+    chainID: chainID,
+  });
+  console.log(tx);
+  console.log("----------------------------------");
+  const res = await terra.tx.broadcast(tx, chainID);
+  console.log(res);
 }
 
 async function createAirdrop(
@@ -198,7 +298,10 @@ async function createAirdrop(
   console.log("----------------------------------");
   const res = await terra.tx.broadcast(tx, chainID);
   console.log(res);
-  const airdropContract = res.logs[0].events[1].attributes[0].value;
+  const airdropContract =
+    res.logs[0].events
+      .find((x) => x.type === "instantiate")
+      ?.attributes.find((x) => x.key == "_contract_address")?.value ?? "";
   console.log("airdropContract", airdropContract);
   return airdropContract;
 }
@@ -373,7 +476,7 @@ async function transferUnclaimedTokens(
 
 async function mint() {
   const cw20 =
-    "terra1hm4y6fzgxgu688jgf7ek66px6xkrtmn3gyk8fax3eawhp68c2d5q74k9fw";
+    "terra1j08452mqwadp8xu25kn9rleyl2gufgfjnv0sn8dvynynakkjukcqsc244x";
 
   const mintMsg = new MsgExecuteContract(
     hallwallet.key.accAddress(prefix),
@@ -387,14 +490,10 @@ async function mint() {
     {}
   );
 
-  const tx = await hallwallet
-    .createAndSignTx({
-      msgs: [mintMsg],
-      chainID: chainID,
-    })
-    .catch((err) => {
-      console.log(err);
-    });
+  const tx = await hallwallet.createAndSignTx({
+    msgs: [mintMsg],
+    chainID: chainID,
+  });
 
   console.log(tx);
   console.log("----------------------------------");
@@ -435,37 +534,47 @@ testall();
 
 async function testall() {
   console.log("SETUP CW20 TOKEN");
-  await mint();
+  const TOKEN_CONTRACT = await setupCW20(protocolWallet);
 
   console.log("UPLOADING CONTRACTS");
   const factoryContract = await uploadContract(hallwallet).then(async (res) => {
     console.log("INSTANTIATING FACTORY");
     await wait(3000);
-    return instantiateFactory(hallwallet, res[0], res[1]);
+    const factoryContract = await instantiateFactory(
+      hallwallet,
+      res[0],
+      res[1]
+    );
+
+    await wait(3000);
+    await updateAirdropConfig(hallwallet, factoryContract, res[1]);
+    return factoryContract;
   });
 
+  // update airdrop config to use cw20 token
+
   console.log("TESTING MULTI TEST 1");
-  await test1(factoryContract).catch((err) => {
+  await test1(factoryContract, TOKEN_CONTRACT).catch((err) => {
     console.log(err);
   });
 
   console.log("TESTING SINGLE TEST 1");
-  await single_test1(factoryContract).catch((err) => {
+  await single_test1(factoryContract, TOKEN_CONTRACT).catch((err) => {
     console.log(err);
   });
 
   console.log("TESTING SINGLE TEST 2");
-  await single_test2(factoryContract).catch((err) => {
+  await single_test2(factoryContract, TOKEN_CONTRACT).catch((err) => {
     console.log(err);
   });
 
   console.log("TESTING SINGLE TEST 3");
-  await single_test3(factoryContract).catch((err) => {
+  await single_test3(factoryContract, TOKEN_CONTRACT).catch((err) => {
     console.log(err);
   });
 
   console.log("TESTING TOPUP TEST");
-  await topup_test(factoryContract).catch((err) => {
+  await topup_test(factoryContract, TOKEN_CONTRACT).catch((err) => {
     console.log(err);
   });
 
@@ -485,7 +594,12 @@ Test scenario for multi mission contract
 - [ ]  User1 claims [4,0,1] astro (Receives 1 astro from mission 3)
 50 - 10 - 6 - 7 = 27
 */
-async function test1(factoryContract: string) {
+async function test1(factoryContract: string, TOKEN_CONTRACT: string) {
+  const asset_info = {
+    token: {
+      contract_addr: TOKEN_CONTRACT,
+    },
+  };
   const starttime = Math.trunc(Date.now() / 1000 + 10);
   const endtime = Math.trunc(Date.now() / 1000 + 50);
   await wait(1500);
@@ -539,7 +653,12 @@ async function test1(factoryContract: string) {
   return airdropContract;
 }
 
-async function single_test1(factoryContract: string) {
+async function single_test1(factoryContract: string, TOKEN_CONTRACT: string) {
+  const asset_info = {
+    token: {
+      contract_addr: TOKEN_CONTRACT,
+    },
+  };
   const starttime = Math.trunc(Date.now() / 1000 + 10);
   const endtime = Math.trunc(Date.now() / 1000 + 30);
 
@@ -582,7 +701,7 @@ async function single_test1(factoryContract: string) {
   return airdropContract;
 }
 
-async function single_test2(factoryContract: string) {
+async function single_test2(factoryContract: string, TOKEN_CONTRACT: string) {
   const starttime = Math.trunc(Date.now() / 1000 + 10);
   const endtime = Math.trunc(Date.now() / 1000 + 30);
   const airdropContract = await createAirdrop(
@@ -609,7 +728,12 @@ async function single_test2(factoryContract: string) {
   transferUnclaimedTokens(protocolWallet, airdropContract);
 }
 
-async function single_test3(factoryContract: string) {
+async function single_test3(factoryContract: string, TOKEN_CONTRACT: string) {
+  const asset_info = {
+    token: {
+      contract_addr: TOKEN_CONTRACT,
+    },
+  };
   await wait(5000);
   const starttime = Math.trunc(Date.now() / 1000 + 10);
   const endtime = Math.trunc(Date.now() / 1000 + 30);
@@ -635,7 +759,12 @@ async function single_test3(factoryContract: string) {
   await transferUnclaimedTokens(protocolWallet, airdropContract);
 }
 
-async function topup_test(factoryContract: string) {
+async function topup_test(factoryContract: string, TOKEN_CONTRACT: string) {
+  const asset_info = {
+    token: {
+      contract_addr: TOKEN_CONTRACT,
+    },
+  };
   const starttime = Math.trunc(Date.now() / 1000 + 10);
   const endtime = Math.trunc(Date.now() / 1000 + 30);
 

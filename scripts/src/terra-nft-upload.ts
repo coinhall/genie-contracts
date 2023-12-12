@@ -12,32 +12,29 @@ import * as path from "path";
 import * as secp256k1 from "secp256k1";
 import keccak256 from "keccak256";
 
-console.log("Example usage: yarn start src/localterra-nft-test.ts --m1");
+console.log("Example usage: yarn start src/terra-nft-test.ts --m1");
 
 const IS_M1 = process.argv[2] === "--m1";
 const M1_MODIFIER = IS_M1 ? "-aarch64" : "";
 
-// const SEED_PHRASE = process.env.SEED_PHRASE;
-// const PROTOCOL_PHRASE = process.env.PROTOCOL_PHRASE;
-// const USER_PHRASE = process.env.USER_PHRASE;
-// const PUBLICKEY = process.env.PUBLICKEY;
-// const PRIVATEKEY = process.env.PRIVATEKEY;
-const SEED_PHRASE =
-  "satisfy adjust timber high purchase tuition stool faith fine install that you unaware feed domain license impose boss human eager hat rent enjoy dawn";
-const PROTOCOL_PHRASE =
-  "quality vacuum heart guard buzz spike sight swarm shove special gym robust assume sudden deposit grid alcohol choice devote leader tilt noodle tide penalty";
-const USER_PHRASE =
-  "symbol force gallery make bulk round subway violin worry mixture penalty kingdom boring survey tool fringe patrol sausage hard admit remember broken alien absorb";
-const PUBLICKEY = "Am1jWYX2c5sI7ukqcso6kdN9UIxo2amNTyxosGY/n/v6";
-const PRIVATEKEY = "fQjH2LwnD650FSDPxja027umgzNlSBxDK5ReFhRZsJQ=";
-const chainID = "localterra";
+const SEED_PHRASE = process.env.SEED_PHRASE;
+const PROTOCOL_PHRASE = process.env.PROTOCOL_PHRASE;
+const USER_PHRASE = process.env.USER_PHRASE;
+const PUBLICKEY = process.env.PUBLICKEY;
+const PRIVATEKEY = process.env.PRIVATEKEY;
+
+const chainID = "pisco-1";
 const prefix = "terra";
 
+const FACTORY_CONTRACT = "genie-airdrop-factory";
+const GENIE_CONTRACT = "genie-airdrop";
+const GENIE_NFT_CONTRACT = "genie-nft";
+const NFT_CONTRACT = "cw721-metadata-onchain";
 const contracts = [
-  "genie-airdrop-factory",
-  "genie-airdrop",
-  "genie-nft",
-  "cw721-base",
+  FACTORY_CONTRACT,
+  GENIE_CONTRACT,
+  GENIE_NFT_CONTRACT,
+  NFT_CONTRACT,
 ];
 
 if (!SEED_PHRASE) {
@@ -62,11 +59,11 @@ if (!PUBLICKEY) {
 }
 
 const terra = new LCDClient({
-  localterra: {
-    lcd: "http://localhost:1317",
+  "pisco-1": {
+    lcd: "https://pisco-lcd.terra.dev",
     chainID: chainID,
     gasAdjustment: 1.75,
-    gasPrices: { uluna: 0.15 },
+    gasPrices: { uluna: 0.015 },
     prefix: prefix,
   },
 });
@@ -110,6 +107,7 @@ async function uploadContract(wallet: Wallet, contracts: String[]) {
       chainID: chainID,
     });
     const res = await terra.tx.broadcast(tx, chainID);
+    console.log(res);
     const codeId = res.logs[0].events
       .find((x) => x.type === "store_code")
       ?.attributes.find((x) => x.key == "code_id")?.value;
@@ -118,6 +116,7 @@ async function uploadContract(wallet: Wallet, contracts: String[]) {
       throw new Error("Code id not found");
     }
     codes.push(parseInt(codeId));
+    await wait(6000);
   }
   return codes;
 }
@@ -245,37 +244,7 @@ async function instatiateAirdropNft(
   return genieNftContract;
 }
 
-async function updateNftAirdropConfig(
-  wallet: Wallet,
-  factoryContract: string,
-  contractCode: number
-) {
-  const updateConfig = new MsgExecuteContract(
-    wallet.key.accAddress(prefix),
-    factoryContract,
-    {
-      update_airdrop_config: {
-        config: {
-          airdrop_type: "nft",
-          code_id: contractCode,
-          is_disabled: false,
-        },
-      },
-    },
-    {}
-  );
-
-  const tx = await wallet.createAndSignTx({
-    msgs: [updateConfig],
-    chainID: chainID,
-  });
-  console.log(tx);
-  console.log("----------------------------------");
-  const res = await terra.tx.broadcast(tx, chainID);
-  console.log(res);
-}
-
-async function createNftAirdrop(
+async function createAirdrop(
   wallet: Wallet,
   factoryContract: string,
   asset: object,
@@ -284,12 +253,12 @@ async function createNftAirdrop(
   to_timestamp: number,
   campaign_id: string
 ) {
-  const createNftAirdrop = new MsgExecuteContract(
+  const createAirdrop = new MsgExecuteContract(
     wallet.key.accAddress(prefix),
     factoryContract,
     {
-      create_nft_airdrop: {
-        nft_info: asset,
+      create_airdrop: {
+        asset_info: asset,
         from_timestamp: from_timestamp,
         to_timestamp: to_timestamp,
         allocated_amounts: allocated_amounts.map((x) => x.toString()),
@@ -299,7 +268,7 @@ async function createNftAirdrop(
     {}
   );
   const tx = await wallet.createAndSignTx({
-    msgs: [createNftAirdrop],
+    msgs: [createAirdrop],
     chainID: chainID,
   });
   console.log(tx);
@@ -422,6 +391,7 @@ async function mintNfts(
       throw err;
     });
     console.log(res);
+    await wait(6000);
   }
   return;
 }
@@ -483,9 +453,9 @@ async function claim(
 }
 
 async function wait(ms: number) {
-  if (chainID === "localterra") {
-    return;
-  }
+  // if (chainID === "localterra") {
+  //   return;
+  // }
 
   return new Promise((resolve) => {
     setTimeout(resolve, ms);
@@ -494,7 +464,7 @@ async function wait(ms: number) {
 async function waitUntil(s: number) {
   const timeUntil = s * 1000;
   console.log("timeUntil", timeUntil);
-  const waiting_time = timeUntil - Date.now() + 5000;
+  const waiting_time = timeUntil - Date.now() + 20000;
   console.log("waiting_time", waiting_time);
   return new Promise((resolve) => {
     setTimeout(resolve, waiting_time);
@@ -519,18 +489,17 @@ async function testall() {
 
   await wait(3000);
   console.log("INSTANTIATING NFT");
-  await instantiateNft(protocolWallet, codes[3]);
+  const nftContract = await instantiateNft(protocolWallet, codes[3]);
+
+  await wait(3000);
   console.log("INSTANTIATING FACTORY");
   const factoryContract = await instantiateFactory(
     hallwallet,
     codes[0],
     codes[1]
   );
-  const nftContract = await instantiateNft(protocolWallet, codes[3]);
-  await wait(3000);
-  await updateNftAirdropConfig(hallwallet, factoryContract, codes[2]);
-  await wait(3000);
-  await testnft1(nftContract, factoryContract);
+
+  await testnft1(nftContract, factoryContract, codes);
 
   console.log("DONE TESTING");
 }
@@ -562,8 +531,8 @@ async function transferUnclaimedTokens(
     {
       transfer_unclaimed_tokens: {
         recipient: wallet.key.accAddress(prefix),
-        // limit: 400,
-        // start_after: "13",
+        limit: 60,
+        start_after: "100",
       },
     },
     {}
@@ -578,20 +547,24 @@ async function transferUnclaimedTokens(
   console.log(res);
 }
 
-async function testnft1(nft_contract: string, factoryContract: string) {
-  const starttime = Math.trunc(Date.now() / 1000 + 60);
-  const endtime = Math.trunc(Date.now() / 1000 + 100);
-  let airdropContract = await createNftAirdrop(
+async function testnft1(
+  nft_contract: string,
+  factoryContract: string,
+  codes: number[]
+) {
+  const starttime = Math.trunc(Date.now() / 1000 + 90);
+  const endtime = Math.trunc(Date.now() / 1000 + 190);
+  let airdropContract = await instatiateAirdropNft(
     protocolWallet,
-    factoryContract,
-    {
-      contract_addr: nft_contract,
-    },
-    [200, 100, 100],
+    codes[2],
     starttime,
     endtime,
-    "1"
+    [200, 100, 100],
+    nft_contract
   );
+
+  // console.log("Transfering NFT to airdrop contract");
+  // await transferNftContract(protocolWallet, nft_contract, airdropContract);
 
   console.log("Mass minting NFTs to airdrop contract");
   await mintNfts(protocolWallet, nft_contract, airdropContract, 0, 400);
@@ -609,26 +582,27 @@ async function testnft1(nft_contract: string, factoryContract: string) {
   await queryNFT(airdropContract, nft_contract);
 
   await claim(userWallet, airdropContract, [2, 0, 0]);
-  await wait(1500); // Wait a bit for wallet nonce to update.
+  await wait(6000); // Wait a bit for wallet nonce to update.
   await claim(userWallet, airdropContract, [3, 0, 0]);
-  await wait(1500);
+  await wait(6000);
   await claim(userWallet, airdropContract, [1, 0, 0])
     .then(throwErr)
     .catch(expectError("Error is thrown for claim amount smaller"));
-  await wait(1500);
+  await wait(6000);
   await claim(userWallet, airdropContract, [1, 0, 3])
     .then(throwErr)
     .catch(expectError("Error is thrown for claim amount smaller"));
-  await wait(1500);
+  await wait(6000);
   await claim(userWallet, airdropContract, [3, 0, 0]);
-  await wait(1500);
+  await wait(6000);
   await claim(protocolWallet, airdropContract, [5, 5, 5]);
-  await wait(1500);
+  await wait(6000);
   await claim(hallwallet, airdropContract, [10, 1, 1]);
-  await wait(1500);
+  await wait(6000);
   await claim(userWallet, airdropContract, [4, 0, 0]);
-  await wait(1500);
+  await wait(6000);
   await claim(userWallet, airdropContract, [10, 10, 10]);
+  await wait(6000);
   await claim(userWallet, airdropContract, [20, 20, 20]);
 
   await queryNFT(userWallet.key.accAddress(prefix), nft_contract);
@@ -639,10 +613,15 @@ async function testnft1(nft_contract: string, factoryContract: string) {
   await waitUntil(endtime);
 
   await transferUnclaimedTokens(protocolWallet, airdropContract);
+  await wait(6000);
   await transferUnclaimedTokens(protocolWallet, airdropContract);
+  await wait(6000);
   await transferUnclaimedTokens(protocolWallet, airdropContract);
+  await wait(6000);
   await transferUnclaimedTokens(protocolWallet, airdropContract);
+  await wait(6000);
   await transferUnclaimedTokens(protocolWallet, airdropContract);
+  await wait(6000);
   await transferUnclaimedTokens(protocolWallet, airdropContract);
 
   await queryNFT(userWallet.key.accAddress(prefix), nft_contract);

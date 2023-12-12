@@ -3,16 +3,9 @@
   "title": "InstantiateMsg",
   "type": "object",
   "required": [
-    "airdrop_code_id",
     "public_key"
   ],
   "properties": {
-    "airdrop_code_id": {
-      "description": "Airdrop contract code ID, which is used to instantiate new airdrops",
-      "type": "integer",
-      "format": "uint64",
-      "minimum": 0.0
-    },
     "public_key": {
       "$ref": "#/definitions/Binary"
     }

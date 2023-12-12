@@ -329,7 +329,7 @@ pub fn handle_transfer_unclaimed_tokens(
     let status = query_status(deps.as_ref(), &env)?.status;
     if status == Status::Ongoing {
         return Err(StdError::generic_err(
-            "campaign is ongoing and transfer_unclaimed_tokens is not",
+            "campaign is ongoing and transfer_unclaimed_tokens is not allowed",
         ));
     }
 
@@ -338,8 +338,8 @@ pub fn handle_transfer_unclaimed_tokens(
         &config.asset.contract_addr,
         &cw721::Cw721QueryMsg::Tokens {
             owner: env.contract.address.to_string(),
-            start_after: start_after,
-            limit: limit,
+            start_after,
+            limit,
         },
     )?;
 
