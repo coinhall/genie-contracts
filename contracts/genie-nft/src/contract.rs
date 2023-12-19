@@ -16,7 +16,6 @@ use rand::Rng;
 use rand_core::SeedableRng;
 use rand_xoshiro::Xoshiro128PlusPlus;
 use sha3::{Digest, Keccak256};
-use shuffle::{fy::FisherYates, shuffler::Shuffler};
 
 const CONTRACT_NAME: &str = "genie-nft";
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -25,7 +24,7 @@ const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 pub fn instantiate(
     deps: DepsMut,
     env: Env,
-    info: MessageInfo,
+    _info: MessageInfo,
     msg: InstantiateMsg,
 ) -> StdResult<Response> {
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
@@ -56,6 +55,7 @@ pub fn instantiate(
         allocated_amounts: msg.allocated_amounts.clone(),
         public_key: msg.public_key,
         mission_count: msg.allocated_amounts.len() as u64,
+        start_id: msg.start_id.unwrap_or(0),
     };
     CONFIG.save(deps.storage, &config)?;
     let state = State {
@@ -64,40 +64,8 @@ pub fn instantiate(
     STATE.save(deps.storage, &state)?;
 
     // create a list of ids and store it in LIST_OF_IDS
-    let end_id = msg.allocated_amounts.iter().sum::<Uint128>();
-    let mut vec_of_ids: Vec<String> = vec![];
-
-    for i in 0..end_id.u128() {
-        let id = i.to_string();
-        vec_of_ids.push(id);
-    }
-
-    let seed_string = format!(
-        "{},{},{},{}",
-        config.asset.contract_addr.to_string(),
-        info.sender.to_string(),
-        env.block.time.nanos(),
-        env.block.height
-    );
-    let randomized_ids = shuffle_vector(seed_string, vec_of_ids)?;
-
-    for (i, id) in randomized_ids.iter().enumerate() {
-        LIST_OF_IDS.save(deps.storage, i as u128, id)?;
-    }
 
     Ok(Response::default())
-}
-
-fn shuffle_vector(seed: String, mut vector: Vec<String>) -> StdResult<Vec<String>> {
-    let hash = Keccak256::digest(seed.as_bytes());
-    let randomness: [u8; 16] = hash.to_vec()[0..16].try_into().unwrap();
-    let mut rng = Xoshiro128PlusPlus::from_seed(randomness);
-    let mut shuffler = FisherYates::default();
-    shuffler
-        .shuffle(&mut vector, &mut rng)
-        .map_err(StdError::generic_err)?;
-
-    Ok(vector)
 }
 
 #[cfg_attr(not(feature = "library"), entry_point)]
@@ -210,13 +178,14 @@ pub fn handle_claim(
         user_info.claimed_amounts = vec![Uint128::zero(); claim_amounts.len()];
     }
 
+    let first = config.start_id;
     let mut last = state
         .unclaimed_amounts
         .clone()
         .into_iter()
         .sum::<Uint128>()
-        .checked_sub(Uint128::from(1u128))
-        .unwrap_or_default()
+        .checked_sub(Uint128::from(1u128))?
+        .checked_add(first.into())?
         .u128();
 
     for (i, amount) in claim_amounts.iter().enumerate() {
@@ -256,13 +225,13 @@ pub fn handle_claim(
     let mut rng = Xoshiro128PlusPlus::from_seed(randomness);
     let rngesus: &mut dyn rand::RngCore = &mut rng;
 
-    let mut nft_ids: Vec<String> = vec![];
+    let mut nft_ids: Vec<u128> = vec![];
     for _ in 0..claim_amount.u128() {
-        let random_number = rngesus.gen_range(0..=last);
+        let random_number = rngesus.gen_range(first..=last);
         let id = LIST_OF_IDS
-            .load(deps.storage, random_number)
-            .unwrap_or_default();
-        let last_id = LIST_OF_IDS.load(deps.storage, last)?;
+            .may_load(deps.storage, random_number)?
+            .unwrap_or(random_number);
+        let last_id = LIST_OF_IDS.may_load(deps.storage, last)?.unwrap_or(last);
         LIST_OF_IDS.save(deps.storage, random_number, &last_id)?;
         LIST_OF_IDS.remove(deps.storage, last);
         last = last.checked_sub(1).unwrap_or_default();
@@ -276,7 +245,7 @@ pub fn handle_claim(
                 contract_addr: config.asset.contract_addr.to_string(),
                 msg: to_json_binary(&cw721::Cw721ExecuteMsg::TransferNft {
                     recipient: recipient.to_string(),
-                    token_id: nft_id,
+                    token_id: nft_id.to_string(),
                 })?,
                 funds: vec![],
             });
@@ -400,8 +369,8 @@ fn query_status(deps: Deps, env: &Env) -> StdResult<StatusResponse> {
     // check ownership by using pagination
     // query cw721 for tokens owned by this contract
 
-    let page = 1;
-    let limit = 1;
+    let page = config.start_id.to_string();
+    let limit = 1u32;
     let tokens: StdResult<cw721::TokensResponse> = deps.querier.query_wasm_smart(
         &config.asset.contract_addr,
         &cw721::Cw721QueryMsg::Tokens {

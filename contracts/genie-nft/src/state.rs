@@ -21,6 +21,8 @@ pub struct Config {
     pub public_key: Binary,
     /// The number of missions in this campaign
     pub mission_count: u64,
+    /// The starting NFT id,
+    pub start_id: u128,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
@@ -41,4 +43,4 @@ pub const CONFIG: Item<Config> = Item::new("config");
 pub const STATE: Item<State> = Item::new("state");
 pub const USERS: Map<&Addr, UserInfo> = Map::new("users");
 
-pub const LIST_OF_IDS: Map<u128, String> = Map::new("list_of_ids");
+pub const LIST_OF_IDS: Map<u128, u128> = Map::new("list_of_ids");

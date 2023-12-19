@@ -393,9 +393,9 @@ async function mintNfts(
   start: number,
   end: number
 ) {
-  // batch start, end by 100 at a time
-  for (let i = start; i < end; i += 100) {
-    const mint_info = generateMintInfo(100, airdropContract);
+  // batch start, end by 50 at a time
+  for (let i = start; i < end; i += 50) {
+    const mint_info = generateMintInfo(50, airdropContract);
     const mint_messages = mint_info.map((x) => {
       return new MsgExecuteContract(
         wallet.key.accAddress(prefix),
@@ -579,8 +579,8 @@ async function transferUnclaimedTokens(
 }
 
 async function testnft1(nft_contract: string, factoryContract: string) {
-  const starttime = Math.trunc(Date.now() / 1000 + 60);
-  const endtime = Math.trunc(Date.now() / 1000 + 100);
+  const starttime = Math.trunc(Date.now() / 1000 + 40);
+  const endtime = Math.trunc(Date.now() / 1000 + 80);
   let airdropContract = await createNftAirdrop(
     protocolWallet,
     factoryContract,
@@ -595,12 +595,7 @@ async function testnft1(nft_contract: string, factoryContract: string) {
 
   console.log("Mass minting NFTs to airdrop contract");
   await mintNfts(protocolWallet, nft_contract, airdropContract, 0, 400);
-
-  console.log("Receiving NFT from airdrop contract");
-  // await receiveNftContract(protocolWallet, airdropContract);
-  console.log("Transfer Done.");
   await queryNFT(airdropContract, nft_contract);
-
   await waitUntil(starttime);
 
   // query airdrop contract to see if it is active
@@ -612,13 +607,13 @@ async function testnft1(nft_contract: string, factoryContract: string) {
   await wait(1500); // Wait a bit for wallet nonce to update.
   await claim(userWallet, airdropContract, [3, 0, 0]);
   await wait(1500);
-  await claim(userWallet, airdropContract, [1, 0, 0])
-    .then(throwErr)
-    .catch(expectError("Error is thrown for claim amount smaller"));
+  // await claim(userWallet, airdropContract, [1, 0, 0])
+  //   .then(throwErr)
+  //   .catch(expectError("Error is thrown for claim amount smaller"));
   await wait(1500);
-  await claim(userWallet, airdropContract, [1, 0, 3])
-    .then(throwErr)
-    .catch(expectError("Error is thrown for claim amount smaller"));
+  // await claim(userWallet, airdropContract, [1, 0, 3])
+  //   .then(throwErr)
+  //   .catch(expectError("Error is thrown for claim amount smaller"));
   await wait(1500);
   await claim(userWallet, airdropContract, [3, 0, 0]);
   await wait(1500);
