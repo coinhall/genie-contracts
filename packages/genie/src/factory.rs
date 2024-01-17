@@ -38,6 +38,7 @@ pub enum ExecuteMsg {
         to_timestamp: u64,
         allocated_amounts: Vec<Uint128>,
         campaign_id: String,
+        icon_url: String
     },
 }
 
@@ -111,4 +112,5 @@ pub struct NftAirdropInstantiateMsg {
     pub from_timestamp: u64,
     pub to_timestamp: u64,
     pub allocated_amounts: Vec<Uint128>,
+    pub icon_url: String
 }

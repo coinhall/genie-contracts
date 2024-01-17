@@ -67,6 +67,7 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> S
             to_timestamp,
             allocated_amounts,
             campaign_id,
+            icon_url,
         } => execute_create_nft_airdrop(
             deps,
             info,
@@ -75,6 +76,7 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> S
             to_timestamp,
             allocated_amounts,
             campaign_id,
+            icon_url,
         ),
     }
 }
@@ -184,6 +186,7 @@ pub fn execute_create_nft_airdrop(
     to_timestamp: u64,
     allocated_amounts: Vec<Uint128>,
     campaign_id: String,
+    icon_url: String,
 ) -> StdResult<Response> {
     let config: Config = CONFIG.load(deps.storage)?;
 
@@ -220,6 +223,7 @@ pub fn execute_create_nft_airdrop(
                 to_timestamp,
                 public_key: config.public_key,
                 allocated_amounts,
+                icon_url,
             })?,
         })))
 }

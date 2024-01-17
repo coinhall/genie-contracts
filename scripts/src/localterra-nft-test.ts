@@ -208,6 +208,8 @@ async function instatiateAirdropNft(
     from_timestamp: from_timestamp,
     to_timestamp: to_timestamp,
     allocated_amounts: allocated_amounts.map((x) => x.toString()),
+    icon_url:
+      "https://i.seadn.io/gae/H8jOCJuQokNqGBpkBN5wk1oZwO7LM8bNnrHCaekV2nKjnCqw6UB5oaH8XyNeBDj6bA_n1mjejzhFQUP3O1NfjFLHr3FOaeHcTOOT?auto=format&dpr=1&w=256", // azuki icon
   };
 
   const instantiateGenieNft = new MsgInstantiateContract(
@@ -294,6 +296,8 @@ async function createNftAirdrop(
         to_timestamp: to_timestamp,
         allocated_amounts: allocated_amounts.map((x) => x.toString()),
         campaign_id: campaign_id,
+        icon_url:
+          "https://i.seadn.io/gae/H8jOCJuQokNqGBpkBN5wk1oZwO7LM8bNnrHCaekV2nKjnCqw6UB5oaH8XyNeBDj6bA_n1mjejzhFQUP3O1NfjFLHr3FOaeHcTOOT?auto=format&dpr=1&w=256", // azuki icon
       },
     },
     {}
