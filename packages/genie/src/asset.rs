@@ -20,7 +20,6 @@ pub enum AssetInfo {
 #[serde(rename_all = "snake_case")]
 pub struct NftInfo {
     pub contract_addr: Addr,
-    pub icon_url: String,
 }
 
 impl NftInfo {

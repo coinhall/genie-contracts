@@ -9,8 +9,8 @@ use cosmwasm_std::{
 };
 use cw2::set_contract_version;
 use genie::airdrop_nft::{
-    ClaimNftPayload, ClaimResponse, ConfigResponse, ExecuteMsg, InstantiateMsg, NftInfoExtended,
-    QueryMsg, StateResponse, Status, StatusResponse, UserInfoResponse,
+    ClaimNftPayload, ClaimResponse, ConfigResponse, ExecuteMsg, InstantiateMsg, QueryMsg,
+    StateResponse, Status, StatusResponse, UserInfoResponse,
 };
 use rand::Rng;
 use rand_core::SeedableRng;
@@ -56,6 +56,7 @@ pub fn instantiate(
         public_key: msg.public_key,
         mission_count: msg.allocated_amounts.len() as u64,
         start_id: msg.start_id.unwrap_or(0),
+        icon_url: msg.icon_url
     };
     CONFIG.save(deps.storage, &config)?;
     let state = State {
@@ -342,17 +343,15 @@ fn query_config(deps: Deps, _env: Env) -> StdResult<ConfigResponse> {
 
     Ok(ConfigResponse {
         owner: config.owner,
-        asset: NftInfoExtended {
-            contract_addr: config.asset.contract_addr.into_string(),
-            icon_url: config.asset.icon_url,
-            name: asset_info.name,
-            symbol: asset_info.symbol,
-        },
+        asset: config.asset,
         from_timestamp: config.from_timestamp,
         to_timestamp: config.to_timestamp,
         allocated_amounts: config.allocated_amounts,
         public_key: config.public_key,
         mission_count: config.mission_count,
+        icon_url: config.icon_url,
+        name: asset_info.name,
+        symbol: asset_info.symbol,
     })
 }
 

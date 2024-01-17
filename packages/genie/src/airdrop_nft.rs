@@ -12,6 +12,7 @@ pub struct InstantiateMsg {
     pub to_timestamp: u64,
     pub allocated_amounts: Vec<Uint128>,
     pub start_id: Option<u128>,
+    pub icon_url: String,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
@@ -54,20 +55,11 @@ pub enum QueryMsg {
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
-#[serde(rename_all = "snake_case")]
-pub struct NftInfoExtended {
-    pub contract_addr: String,
-    pub icon_url: String,
-    pub name: String,
-    pub symbol: String,
-}
-
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct ConfigResponse {
     /// Account with 'owner' credentials
     pub owner: Addr,
     /// Campaign reward asset
-    pub asset: NftInfoExtended,
+    pub asset: NftInfo,
     /// Timestamp for the start of this campaign
     pub from_timestamp: u64,
     /// Timestamp for the end of this campaign
@@ -78,6 +70,12 @@ pub struct ConfigResponse {
     pub public_key: Binary,
     /// The number of missions in this campaign
     pub mission_count: u64,
+    /// The icon url of the NFT
+    pub icon_url: String,
+    /// The name of the NFT
+    pub name: String,
+    /// The symbol of the NFT
+    pub symbol: String,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]

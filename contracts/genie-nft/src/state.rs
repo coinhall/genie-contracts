@@ -23,6 +23,8 @@ pub struct Config {
     pub mission_count: u64,
     /// The starting NFT id,
     pub start_id: u128,
+    /// The NFT icon url
+    pub icon_url: String,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
