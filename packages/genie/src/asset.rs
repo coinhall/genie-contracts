@@ -15,11 +15,12 @@ pub enum AssetInfo {
     NativeToken { denom: String },
 }
 
-/// A wrapper to represent both native coins and cw20 tokens as a single type
+/// A wrapper to represent NFT as a single type
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub struct NftInfo {
     pub contract_addr: Addr,
+    pub icon_url: String,
 }
 
 impl NftInfo {

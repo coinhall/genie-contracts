@@ -9,8 +9,8 @@ use cosmwasm_std::{
 };
 use cw2::set_contract_version;
 use genie::airdrop_nft::{
-    ClaimNftPayload, ClaimResponse, ExecuteMsg, InstantiateMsg, QueryMsg, StateResponse, Status,
-    StatusResponse, UserInfoResponse,
+    ClaimNftPayload, ClaimResponse, ConfigResponse, ExecuteMsg, InstantiateMsg, NftInfoExtended,
+    QueryMsg, StateResponse, Status, StatusResponse, UserInfoResponse,
 };
 use rand::Rng;
 use rand_core::SeedableRng;
@@ -91,7 +91,7 @@ pub fn execute(
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
-        QueryMsg::Config {} => to_json_binary(&CONFIG.load(deps.storage)?),
+        QueryMsg::Config {} => to_json_binary(&query_config(deps, env)?),
         QueryMsg::State {} => to_json_binary(&query_state(deps, env)?),
         QueryMsg::HasUserClaimed { address } => {
             to_json_binary(&query_has_user_claimed(deps, address)?)
@@ -331,6 +331,29 @@ pub fn handle_transfer_unclaimed_tokens(
     return Ok(Response::new()
         .add_messages(messages)
         .add_attribute("action", "transfer_unclaimed_tokens"));
+}
+
+fn query_config(deps: Deps, _env: Env) -> StdResult<ConfigResponse> {
+    let config = CONFIG.load(deps.storage)?;
+    let asset_info: cw721::ContractInfoResponse = deps.querier.query_wasm_smart(
+        config.asset.contract_addr.clone(),
+        &cw721::Cw721QueryMsg::ContractInfo {},
+    )?;
+
+    Ok(ConfigResponse {
+        owner: config.owner,
+        asset: NftInfoExtended {
+            contract_addr: config.asset.contract_addr.into_string(),
+            icon_url: config.asset.icon_url,
+            name: asset_info.name,
+            symbol: asset_info.symbol,
+        },
+        from_timestamp: config.from_timestamp,
+        to_timestamp: config.to_timestamp,
+        allocated_amounts: config.allocated_amounts,
+        public_key: config.public_key,
+        mission_count: config.mission_count,
+    })
 }
 
 fn query_state(deps: Deps, _env: Env) -> StdResult<StateResponse> {
