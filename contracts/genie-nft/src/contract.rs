@@ -56,11 +56,13 @@ pub fn instantiate(
         public_key: msg.public_key,
         mission_count: msg.allocated_amounts.len() as u64,
         start_id: msg.start_id.unwrap_or(0),
-        icon_url: msg.icon_url
+        icon_url: msg.icon_url,
     };
     CONFIG.save(deps.storage, &config)?;
     let state = State {
         unclaimed_amounts: msg.allocated_amounts.clone(),
+        protocol_funding: Uint128::zero(),
+        nft_balance: Uint128::zero(),
     };
     STATE.save(deps.storage, &state)?;
 
@@ -78,9 +80,11 @@ pub fn execute(
 ) -> Result<Response, StdError> {
     match msg {
         ExecuteMsg::Claim { payload } => handle_claim(deps, env, info, payload),
-        ExecuteMsg::IncreaseIncentives { topup_amounts } => {
-            handle_increase_incentives(deps, env, info, topup_amounts)
-        }
+        ExecuteMsg::IncreaseIncentives {
+            topup_amounts,
+            start_after,
+            limit,
+        } => handle_increase_incentives(deps, env, info, topup_amounts, start_after, limit),
         ExecuteMsg::TransferUnclaimedTokens {
             recipient,
             start_after,
@@ -104,9 +108,11 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> StdResult<Binary> {
 
 pub fn handle_increase_incentives(
     deps: DepsMut,
-    _env: Env,
+    env: Env,
     info: MessageInfo,
-    topup_amounts: Option<Vec<Uint128>>,
+    _topup_amounts: Option<Vec<Uint128>>,
+    start_after: Option<String>,
+    limit: Option<u32>,
 ) -> Result<Response, StdError> {
     let config = CONFIG.load(deps.storage)?;
     if info.sender != config.owner {
@@ -114,23 +120,94 @@ pub fn handle_increase_incentives(
     }
 
     let mut state = STATE.load(deps.storage)?;
-    let mut unclaimed_amounts = state.unclaimed_amounts;
+    let unclaimed_amounts = state.unclaimed_amounts.clone();
+    let total_unclaimed_amounts = unclaimed_amounts.into_iter().sum::<Uint128>();
 
-    if let Some(topup_amounts) = topup_amounts {
-        if topup_amounts.len() != unclaimed_amounts.len() {
-            return Err(StdError::generic_err(
-                "topup amount length does not match claimable amount length",
-            ));
-        }
-        for (i, amount) in topup_amounts.iter().enumerate() {
-            unclaimed_amounts[i] = unclaimed_amounts[i].checked_add(*amount)?;
-        }
+    let config = CONFIG.load(deps.storage)?;
+    if info.sender != config.owner {
+        return Err(StdError::generic_err("unauthorized"));
+    }
+    let status = query_status(deps.as_ref(), &env)?.status;
+    if status == Status::Ongoing {
+        return Err(StdError::generic_err(
+            "campaign is ongoing and transfer_unclaimed_tokens is not allowed",
+        ));
     }
 
-    state.unclaimed_amounts = unclaimed_amounts;
+    // query NFT contract for all tokens owned by this contract
+    let limit = limit.unwrap_or(100);
+    let limit = if (total_unclaimed_amounts - state.protocol_funding) < limit.into() {
+        (total_unclaimed_amounts - state.protocol_funding).u128() as u32
+    } else {
+        limit
+    };
+
+    let ids_to_receive: cw721::TokensResponse = deps.querier.query_wasm_smart(
+        &config.asset.contract_addr,
+        &cw721::Cw721QueryMsg::Tokens {
+            owner: info.sender.to_string(),
+            start_after,
+            limit: Some(limit),
+        },
+    )?;
+
+    let messages = ids_to_receive
+        .tokens
+        .clone()
+        .into_iter()
+        .map(|id| {
+            let msg = CosmosMsg::Wasm(WasmMsg::Execute {
+                contract_addr: config.asset.contract_addr.to_string(),
+                msg: to_json_binary(&cw721::Cw721ExecuteMsg::TransferNft {
+                    recipient: env.contract.address.to_string(),
+                    token_id: id,
+                })?,
+                funds: vec![],
+            });
+            Ok(msg)
+        })
+        .collect::<StdResult<Vec<CosmosMsg>>>()?;
+
+    // if let Some(topup_amounts) = topup_amounts {
+    //     if topup_amounts.len() != unclaimed_amounts.len() {
+    //         return Err(StdError::generic_err(
+    //             "topup amount length does not match claimable amount length",
+    //         ));
+    //     }
+    //     for (i, amount) in topup_amounts.iter().enumerate() {
+    //         unclaimed_amounts[i] = unclaimed_amounts[i].checked_add(*amount)?;
+    //     }
+    // }
+    // state.unclaimed_amounts = unclaimed_amounts;
+
+    for i in 0..messages.len() {
+        LIST_OF_IDS.save(
+            deps.storage,
+            state.protocol_funding.u128() + i as u128,
+            &ids_to_receive.tokens[i],
+        )?;
+    }
+
+    state.protocol_funding = state
+        .protocol_funding
+        .checked_add(Uint128::from(messages.len() as u128))?;
+    state.nft_balance = state
+        .nft_balance
+        .checked_add(Uint128::from(messages.len() as u128))?;
     STATE.save(deps.storage, &state)?;
 
-    Ok(Response::new().add_attribute("action", "increase_incentives"))
+    Ok(Response::new()
+        .add_attributes(vec![
+            attr("action", "increase_incentives"),
+            attr("amount", messages.len().to_string()),
+            attr("protocol_funding", state.protocol_funding.to_string()),
+            attr(
+                "total_allocated_amounts",
+                total_unclaimed_amounts.to_string(),
+            ),
+            attr("asset", config.asset.asset_string()),
+        ])
+        .add_messages(messages))
 }
 
 pub fn handle_claim(
@@ -205,6 +282,10 @@ pub fn handle_claim(
         claimable_amounts.push(actual_claim_amount);
     }
 
+    state.nft_balance = state
+        .nft_balance
+        .checked_sub(Uint128::from(claimable_amounts.len() as u128))
+        .unwrap_or(Uint128::from(0u128));
     // save the new state
     STATE.save(deps.storage, &state)?;
 
@@ -226,13 +307,11 @@ pub fn handle_claim(
     let mut rng = Xoshiro128PlusPlus::from_seed(randomness);
     let rngesus: &mut dyn rand::RngCore = &mut rng;
 
-    let mut nft_ids: Vec<u128> = vec![];
+    let mut nft_ids: Vec<String> = vec![];
     for _ in 0..claim_amount.u128() {
         let random_number = rngesus.gen_range(first..=last);
-        let id = LIST_OF_IDS
-            .may_load(deps.storage, random_number)?
-            .unwrap_or(random_number);
-        let last_id = LIST_OF_IDS.may_load(deps.storage, last)?.unwrap_or(last);
+        let id = LIST_OF_IDS.load(deps.storage, random_number)?;
+        let last_id = LIST_OF_IDS.load(deps.storage, last)?;
         LIST_OF_IDS.save(deps.storage, random_number, &last_id)?;
         LIST_OF_IDS.remove(deps.storage, last);
         last = last.checked_sub(1).unwrap_or_default();
@@ -329,6 +408,16 @@ pub fn handle_transfer_unclaimed_tokens(
         })
         .collect::<StdResult<Vec<CosmosMsg>>>()?;
 
+    let mut state = STATE.load(deps.storage)?;
+    state.protocol_funding = state
+        .protocol_funding
+        .checked_sub(Uint128::from(messages.len() as u128))
+        .unwrap_or(Uint128::from(0u128));
+    state.nft_balance = state
+        .nft_balance
+        .checked_sub(Uint128::from(messages.len() as u128))
+        .unwrap_or(Uint128::from(0u128));
+
     return Ok(Response::new()
         .add_messages(messages)
         .add_attribute("action", "transfer_unclaimed_tokens"));
@@ -361,6 +450,7 @@ fn query_state(deps: Deps, _env: Env) -> StdResult<StateResponse> {
 
     Ok(StateResponse {
         unclaimed_amounts: state.unclaimed_amounts,
+        nft_balance: state.nft_balance,
     })
 }
 
@@ -386,32 +476,19 @@ fn query_has_user_claimed(deps: Deps, user_address: String) -> StdResult<ClaimRe
 
 fn query_status(deps: Deps, env: &Env) -> StdResult<StatusResponse> {
     let config = CONFIG.load(deps.storage)?;
+    let state = STATE.load(deps.storage)?;
     let users_is_empty = USERS.is_empty(deps.storage);
 
-    // check ownership by using pagination
-    // query cw721 for tokens owned by this contract
-
-    let page = config.start_id.to_string();
-    let limit = 1u32;
-    let tokens: StdResult<cw721::TokensResponse> = deps.querier.query_wasm_smart(
-        &config.asset.contract_addr,
-        &cw721::Cw721QueryMsg::Tokens {
-            owner: env.contract.address.to_string(),
-            start_after: Some(page.to_string()),
-            limit: Some(limit),
-        },
-    );
-
-    let has_token = match tokens {
-        Ok(tokens) => !tokens.tokens.is_empty(),
-        _ => false,
-    };
+    let current_amount = state.protocol_funding;
 
     if env.block.time.seconds() < config.from_timestamp {
         Ok(StatusResponse {
             status: Status::NotStarted,
         })
-    } else if env.block.time.seconds() >= config.from_timestamp && !has_token && users_is_empty {
+    } else if env.block.time.seconds() >= config.from_timestamp
+        && current_amount < config.allocated_amounts.iter().sum()
+        && users_is_empty
+    {
         Ok(StatusResponse {
             status: Status::Invalid,
         })
