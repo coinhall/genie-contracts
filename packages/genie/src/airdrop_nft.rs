@@ -22,7 +22,8 @@ pub enum ExecuteMsg {
         payload: Binary,
     },
     IncreaseIncentives {
-        topup_amounts: Option<Vec<Uint128>>,
+        start_after: Option<String>,
+        limit: Option<u32>,
     },
     TransferUnclaimedTokens {
         recipient: String,
@@ -112,4 +113,8 @@ pub struct LastClaimerInfo {
 pub struct StateResponse {
     /// Unclaimed amount, per mission, currently in this contract
     pub unclaimed_amounts: Vec<Uint128>,
+    /// Current balance of the contract, used by UI to display the total amount of tokens held by this contract
+    pub current_balance: Uint128,
+    /// Total funds protocol has sent and removed to this contract via `increase_incentives` and `transfer_unclaimed_tokens`
+    pub protocol_funding: Uint128,
 }

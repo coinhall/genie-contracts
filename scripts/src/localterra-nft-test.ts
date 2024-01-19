@@ -320,27 +320,52 @@ async function createNftAirdrop(
   console.log("airdropContract", airdropContract);
   return airdropContract;
 }
-async function increaseIncentives(
+
+async function approveAll(
   wallet: Wallet,
-  token_contract: string,
-  amount: number,
+  nftContract: string,
   airdropContract: string
 ) {
-  const astroSend = {
-    send: {
-      contract: airdropContract,
-      amount: amount.toString(),
-      msg: Buffer.from(
-        JSON.stringify({
-          increase_incentives: {},
-        })
-      ).toString("base64"),
+  const approveAll = new MsgExecuteContract(
+    wallet.key.accAddress(prefix),
+    nftContract,
+    {
+      approve_all: {
+        operator: airdropContract,
+        // expires: {
+        //   at_time: "1715636789000000000",
+        // },
+        // expires:{
+        //   at_height: 1705636539,
+        // }
+        expires: {
+          never: {},
+        },
+      },
+    },
+
+    {}
+  );
+  const tx = await wallet.createAndSignTx({
+    msgs: [approveAll],
+    chainID: chainID,
+  });
+  console.log(tx);
+  console.log("----------------------------------");
+  const res = await terra.tx.broadcast(tx, chainID);
+  console.log(res);
+}
+
+async function increaseNftIncentives(wallet: Wallet, airdrop_contract: string) {
+  let msg = {
+    increase_incentives: {
+      limit: 100,
     },
   };
   const sendTokens = new MsgExecuteContract(
     wallet.key.accAddress(prefix),
-    token_contract,
-    astroSend,
+    airdrop_contract,
+    msg,
     {}
   );
 
@@ -350,7 +375,10 @@ async function increaseIncentives(
   });
   console.log(tx);
   console.log("----------------------------------");
-  const res = await terra.tx.broadcast(tx, chainID);
+  const res = await terra.tx.broadcast(tx, chainID).catch((err) => {
+    console.log(err);
+    throw err;
+  });
   console.log(res);
 }
 
@@ -425,6 +453,7 @@ async function mintNfts(
       console.log(err);
       throw err;
     });
+    await wait(1000);
     console.log(res);
   }
   return;
@@ -598,13 +627,32 @@ async function testnft1(nft_contract: string, factoryContract: string) {
   );
 
   console.log("Mass minting NFTs to airdrop contract");
-  await mintNfts(protocolWallet, nft_contract, airdropContract, 0, 400);
+  await mintNfts(
+    protocolWallet,
+    nft_contract,
+    protocolWallet.key.accAddress("terra"),
+    0,
+    400
+  );
+  await wait(3000);
+  await approveAll(protocolWallet, nft_contract, airdropContract);
+  await wait(3000);
+  await increaseNftIncentives(protocolWallet, airdropContract).catch((err) =>
+    console.log(err)
+  );
+  await wait(3000);
+  await increaseNftIncentives(protocolWallet, airdropContract);
+  await increaseNftIncentives(protocolWallet, airdropContract);
+  await increaseNftIncentives(protocolWallet, airdropContract);
   await queryNFT(airdropContract, nft_contract);
   await waitUntil(starttime);
 
   // query airdrop contract to see if it is active
 
   await queryAirdrop(airdropContract);
+  await queryNFT(userWallet.key.accAddress(prefix), nft_contract);
+  await queryNFT(protocolWallet.key.accAddress(prefix), nft_contract);
+  await queryNFT(hallwallet.key.accAddress(prefix), nft_contract);
   await queryNFT(airdropContract, nft_contract);
 
   await claim(userWallet, airdropContract, [2, 0, 0]);

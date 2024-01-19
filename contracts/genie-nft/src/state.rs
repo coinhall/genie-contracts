@@ -31,6 +31,12 @@ pub struct Config {
 pub struct State {
     /// Unclaimed amount, per mission, currently in this contract
     pub unclaimed_amounts: Vec<Uint128>,
+    /// Total funds protocol has sent and removed to this contract via `increase_incentives` and `transfer_unclaimed_tokens`
+    pub protocol_funding: Uint128,
+    /// Number of NFTs held by this contract, counted by 'increase_incentives', 'transfer_unclaimed_tokens', 'claim'
+    /// NFT balance is not used by smart contract logic, but is used by the UI to display the number of NFTs held by this contract
+    /// Thus any math done on this value must not affect the smart contract logic or fail the contract
+    pub current_balance: Uint128,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema, Default)]
@@ -45,4 +51,4 @@ pub const CONFIG: Item<Config> = Item::new("config");
 pub const STATE: Item<State> = Item::new("state");
 pub const USERS: Map<&Addr, UserInfo> = Map::new("users");
 
-pub const LIST_OF_IDS: Map<u128, u128> = Map::new("list_of_ids");
+pub const LIST_OF_IDS: Map<u128, String> = Map::new("list_of_ids");
