@@ -62,7 +62,7 @@ pub fn instantiate(
     let state = State {
         unclaimed_amounts: msg.allocated_amounts.clone(),
         protocol_funding: Uint128::zero(),
-        nft_balance: Uint128::zero(),
+        current_balance: Uint128::zero(),
     };
     STATE.save(deps.storage, &state)?;
 
@@ -80,11 +80,9 @@ pub fn execute(
 ) -> Result<Response, StdError> {
     match msg {
         ExecuteMsg::Claim { payload } => handle_claim(deps, env, info, payload),
-        ExecuteMsg::IncreaseIncentives {
-            topup_amounts,
-            start_after,
-            limit,
-        } => handle_increase_incentives(deps, env, info, topup_amounts, start_after, limit),
+        ExecuteMsg::IncreaseIncentives { start_after, limit } => {
+            handle_increase_incentives(deps, env, info, start_after, limit)
+        }
         ExecuteMsg::TransferUnclaimedTokens {
             recipient,
             start_after,
@@ -110,19 +108,9 @@ pub fn handle_increase_incentives(
     deps: DepsMut,
     env: Env,
     info: MessageInfo,
-    _topup_amounts: Option<Vec<Uint128>>,
     start_after: Option<String>,
     limit: Option<u32>,
 ) -> Result<Response, StdError> {
-    let config = CONFIG.load(deps.storage)?;
-    if info.sender != config.owner {
-        return Err(StdError::generic_err("unauthorized"));
-    }
-
-    let mut state = STATE.load(deps.storage)?;
-    let unclaimed_amounts = state.unclaimed_amounts.clone();
-    let total_unclaimed_amounts = unclaimed_amounts.into_iter().sum::<Uint128>();
-
     let config = CONFIG.load(deps.storage)?;
     if info.sender != config.owner {
         return Err(StdError::generic_err("unauthorized"));
@@ -133,6 +121,10 @@ pub fn handle_increase_incentives(
             "campaign is ongoing and transfer_unclaimed_tokens is not allowed",
         ));
     }
+
+    let mut state = STATE.load(deps.storage)?;
+    let unclaimed_amounts = state.unclaimed_amounts.clone();
+    let total_unclaimed_amounts = unclaimed_amounts.into_iter().sum::<Uint128>();
 
     // query NFT contract for all tokens owned by this contract
     let limit = limit.unwrap_or(100);
@@ -168,18 +160,6 @@ pub fn handle_increase_incentives(
         })
         .collect::<StdResult<Vec<CosmosMsg>>>()?;
 
-    // if let Some(topup_amounts) = topup_amounts {
-    //     if topup_amounts.len() != unclaimed_amounts.len() {
-    //         return Err(StdError::generic_err(
-    //             "topup amount length does not match claimable amount length",
-    //         ));
-    //     }
-    //     for (i, amount) in topup_amounts.iter().enumerate() {
-    //         unclaimed_amounts[i] = unclaimed_amounts[i].checked_add(*amount)?;
-    //     }
-    // }
-    // state.unclaimed_amounts = unclaimed_amounts;
-
     for i in 0..messages.len() {
         LIST_OF_IDS.save(
             deps.storage,
@@ -191,8 +171,8 @@ pub fn handle_increase_incentives(
     state.protocol_funding = state
         .protocol_funding
         .checked_add(Uint128::from(messages.len() as u128))?;
-    state.nft_balance = state
-        .nft_balance
+    state.current_balance = state
+        .current_balance
         .checked_add(Uint128::from(messages.len() as u128))?;
     STATE.save(deps.storage, &state)?;
 
@@ -282,8 +262,8 @@ pub fn handle_claim(
         claimable_amounts.push(actual_claim_amount);
     }
 
-    state.nft_balance = state
-        .nft_balance
+    state.current_balance = state
+        .current_balance
         .checked_sub(Uint128::from(claimable_amounts.len() as u128))
         .unwrap_or(Uint128::from(0u128));
     // save the new state
@@ -378,7 +358,7 @@ pub fn handle_transfer_unclaimed_tokens(
     let status = query_status(deps.as_ref(), &env)?.status;
     if status == Status::Ongoing {
         return Err(StdError::generic_err(
-            "campaign is ongoing and transfer_unclaimed_tokens is not allowed",
+            "campaign is ongoing and handle_transfer_unclaimed is not allowed",
         ));
     }
 
@@ -413,8 +393,8 @@ pub fn handle_transfer_unclaimed_tokens(
         .protocol_funding
         .checked_sub(Uint128::from(messages.len() as u128))
         .unwrap_or(Uint128::from(0u128));
-    state.nft_balance = state
-        .nft_balance
+    state.current_balance = state
+        .current_balance
         .checked_sub(Uint128::from(messages.len() as u128))
         .unwrap_or(Uint128::from(0u128));
 
@@ -450,7 +430,8 @@ fn query_state(deps: Deps, _env: Env) -> StdResult<StateResponse> {
 
     Ok(StateResponse {
         unclaimed_amounts: state.unclaimed_amounts,
-        nft_balance: state.nft_balance,
+        protocol_funding: state.protocol_funding,
+        current_balance: state.current_balance,
     })
 }
 

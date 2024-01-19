@@ -332,8 +332,18 @@ async function approveAll(
     {
       approve_all: {
         operator: airdropContract,
+        // expires: {
+        //   at_time: "1715636789000000000",
+        // },
+        // expires:{
+        //   at_height: 1705636539,
+        // }
+        expires: {
+          never: {},
+        },
       },
     },
+
     {}
   );
   const tx = await wallet.createAndSignTx({
