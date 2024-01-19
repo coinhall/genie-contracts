@@ -1,7 +1,7 @@
 use crate::crypto::is_valid_signature;
 use crate::state::{Config, State, CONFIG, LAST_CLAIMER, STATE, USERS};
 use cosmwasm_std::{
-    attr, entry_point, from_binary, to_binary, Attribute, Binary, CosmosMsg, Deps, DepsMut, Env,
+    attr, entry_point, from_json, to_json_binary, Attribute, Binary, CosmosMsg, Deps, DepsMut, Env,
     MessageInfo, Response, StdError, StdResult, Storage, Uint128,
 };
 use cw2::set_contract_version;
@@ -84,13 +84,15 @@ pub fn execute(
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
-        QueryMsg::Config {} => to_binary(&CONFIG.load(deps.storage)?),
-        QueryMsg::State {} => to_binary(&query_state(deps, env)?),
-        QueryMsg::HasUserClaimed { address } => to_binary(&query_has_user_claimed(deps, address)?),
-        QueryMsg::UserInfo { address } => to_binary(&query_user_info(deps, address)?),
-        QueryMsg::Status {} => to_binary(&query_status(deps.storage, &env)?),
+        QueryMsg::Config {} => to_json_binary(&CONFIG.load(deps.storage)?),
+        QueryMsg::State {} => to_json_binary(&query_state(deps, env)?),
+        QueryMsg::HasUserClaimed { address } => {
+            to_json_binary(&query_has_user_claimed(deps, address)?)
+        }
+        QueryMsg::UserInfo { address } => to_json_binary(&query_user_info(deps, address)?),
+        QueryMsg::Status {} => to_json_binary(&query_status(deps.storage, &env)?),
         QueryMsg::UserLootboxInfo { address } => {
-            to_binary(&query_user_lootbox_data(deps, address)?)
+            to_json_binary(&query_user_lootbox_data(deps, address)?)
         }
     }
 }
@@ -114,7 +116,7 @@ pub fn receive_cw20(
             }
         }
     };
-    match from_binary(&cw20_msg.msg)? {
+    match from_json(&cw20_msg.msg)? {
         Cw20HookMsg::IncreaseIncentives { topup_amounts } => {
             handle_increase_incentives(deps, env, cw20_msg.amount, topup_amounts)
         }
@@ -299,7 +301,7 @@ pub fn handle_claim(
         claim_amounts,
         signature,
         lootbox_info,
-    } = from_binary(&payload)?;
+    } = from_json(&payload)?;
     if query_status(deps.storage, &env)?.status != Status::Ongoing {
         return Err(StdError::generic_err("campaign is not ongoing"));
     }

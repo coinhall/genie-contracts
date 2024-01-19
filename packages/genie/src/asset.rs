@@ -1,8 +1,9 @@
 use cosmwasm_std::{
-    to_binary, Addr, AllBalanceResponse, BankMsg, BankQuery, Coin, CosmosMsg, QuerierWrapper,
+    to_json_binary, Addr, AllBalanceResponse, BankMsg, BankQuery, Coin, CosmosMsg, QuerierWrapper,
     QueryRequest, StdResult, Uint128, WasmMsg, WasmQuery,
 };
 use cw20::{BalanceResponse, Cw20ExecuteMsg, Cw20QueryMsg};
+
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
@@ -12,6 +13,19 @@ use serde::{Deserialize, Serialize};
 pub enum AssetInfo {
     Token { contract_addr: Addr },
     NativeToken { denom: String },
+}
+
+/// A wrapper to represent NFT as a single type
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub struct NftInfo {
+    pub contract_addr: Addr,
+}
+
+impl NftInfo {
+    pub fn asset_string(&self) -> String {
+        self.contract_addr.to_string()
+    }
 }
 
 impl AssetInfo {
@@ -61,7 +75,7 @@ fn get_cw20_balance(
 ) -> StdResult<Uint128> {
     let query: BalanceResponse = querier.query(&QueryRequest::Wasm(WasmQuery::Smart {
         contract_addr: token_address.into(),
-        msg: to_binary(&Cw20QueryMsg::Balance {
+        msg: to_json_binary(&Cw20QueryMsg::Balance {
             address: account_addr.into(),
         })?,
     }))?;
@@ -103,7 +117,7 @@ fn build_transfer_cw20_token_msg(
 ) -> StdResult<CosmosMsg> {
     Ok(CosmosMsg::Wasm(WasmMsg::Execute {
         contract_addr: token_contract_address,
-        msg: to_binary(&Cw20ExecuteMsg::Transfer {
+        msg: to_json_binary(&Cw20ExecuteMsg::Transfer {
             recipient: recipient.into(),
             amount,
         })?,

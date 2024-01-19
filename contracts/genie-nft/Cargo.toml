@@ -1,0 +1,61 @@
+[package]
+name = "genie-nft"
+version = "0.1.1"
+authors = ["Coinhall"]
+edition = "2018"
+
+exclude = [
+  # Those files are rust-optimizer artifacts. You might want to commit them for convenience but they should not be part of the source code publication.
+  "contract.wasm",
+  "hash.txt",
+]
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[features]
+# for more explicit tests, cargo test --features=backtraces
+backtraces = ["cosmwasm-std/backtraces"]
+# use library feature to disable all instantiate/execute/query exports
+library = []
+
+[package.metadata.scripts]
+optimize = """docker run --rm -v "$(pwd)":/code \
+  --mount type=volume,source="$(basename "$(pwd)")_cache",target=/code/target \
+  --mount type=volume,source=registry_cache,target=/usr/local/cargo/registry \
+  cosmwasm/rust-optimizer:0.12.11
+"""
+optimize-m1 = """docker run --rm -v "$(pwd)":/code \
+  --mount type=volume,source="$(basename "$(pwd)")_cache_arm",target=/code/target \
+  --mount type=volume,source=registry_cache_arm,target=/usr/local/cargo/registry \
+  cosmwasm/workspace-optimizer-arm64:0.12.11
+"""
+
+[dependencies]
+genie = { path = "../../packages/genie", default-features = false, version = "0.1.1" }
+cosmwasm-std = "1.5.0"
+cw-storage-plus = "1.1.0"
+cw2 = "0.13.4"
+cw-controllers = "0.13.2"
+schemars = "0.8.8"
+serde = { version = "1.0.137", default-features = false, features = ["derive"] }
+thiserror = "1.0.31"
+uint = "0.9.3"
+cw721 = "0.15.0"
+cw721-base = { version = "0.15.0", features = ["library"] }
+cw721-metadata-onchain = { version = "0.15.0", features = ["library"] }
+cosmwasm-storage = "1.0.0"
+hex = "0.4.3"
+sha3 = "0.9.1"
+cw-ownable = "0.5.1"
+
+shuffle = { git = "https://github.com/webmaster128/shuffle", branch = "rm-getrandom", version = "0.1.7" }
+rand_core = { version = "0.6.4", default-features = false }
+rand_xoshiro = { version = "0.6.0", default-features = false }
+rand = { version = "0.8.4", default-features = false }
+
+
+[dev-dependencies]
+cosmwasm-schema = { version = "1.0.0" }

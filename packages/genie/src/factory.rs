@@ -1,24 +1,28 @@
-use crate::{airdrop::Status, asset::AssetInfo};
+use std::fmt::{Display, Formatter, Result};
+
+use crate::{
+    airdrop::Status,
+    asset::{AssetInfo, NftInfo},
+};
 use cosmwasm_std::{Binary, Uint128};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct InstantiateMsg {
-    /// Airdrop contract code ID, which is used to instantiate new airdrops
-    pub airdrop_code_id: u64,
     pub public_key: Binary,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum ExecuteMsg {
-    /// Update relevant code IDs
+    /// Update owner or public key
     UpdateConfig {
         owner: Option<String>,
-        airdrop_code_id: Option<u64>,
         public_key: Option<Binary>,
     },
+    /// Update relevant code IDs
+    UpdateAirdropConfig { config: AirdropConfig },
     /// Create a new airdrop contract
     CreateAirdrop {
         asset_info: AssetInfo,
@@ -26,6 +30,15 @@ pub enum ExecuteMsg {
         to_timestamp: u64,
         allocated_amounts: Vec<Uint128>,
         campaign_id: String,
+    },
+    /// Create a new nft airdrop contract
+    CreateNftAirdrop {
+        nft_info: NftInfo,
+        from_timestamp: u64,
+        to_timestamp: u64,
+        allocated_amounts: Vec<Uint128>,
+        campaign_id: String,
+        icon_url: String
     },
 }
 
@@ -37,10 +50,34 @@ pub enum QueryMsg {
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+pub struct AirdropConfig {
+    pub airdrop_type: AirdropType,
+    pub code_id: u64,
+    pub is_disabled: bool,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum AirdropType {
+    Asset,
+    Nft,
+}
+
+/// Returns a raw encoded string representing the name of each airdrop type
+impl Display for AirdropType {
+    fn fmt(&self, fmt: &mut Formatter) -> Result {
+        match self {
+            AirdropType::Asset => fmt.write_str("asset"),
+            AirdropType::Nft => fmt.write_str("nft"),
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct ConfigResponse {
     pub owner: String,
-    pub airdrop_code_id: u64,
     pub public_key: Binary,
+    pub airdrop_configs: Vec<AirdropConfig>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
@@ -58,11 +95,22 @@ pub struct CampaignStatusesResponse {
 pub struct MigrateMsg {}
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
-pub struct AirdropInstantiateMsg {
+pub struct AssetAirdropInstantiateMsg {
     pub owner: String,
     pub asset: AssetInfo,
     pub public_key: Binary,
     pub from_timestamp: u64,
     pub to_timestamp: u64,
     pub allocated_amounts: Vec<Uint128>,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+pub struct NftAirdropInstantiateMsg {
+    pub owner: String,
+    pub asset: NftInfo,
+    pub public_key: Binary,
+    pub from_timestamp: u64,
+    pub to_timestamp: u64,
+    pub allocated_amounts: Vec<Uint128>,
+    pub icon_url: String
 }

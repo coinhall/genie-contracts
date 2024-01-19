@@ -2,8 +2,10 @@
 members = [
   "packages/genie",
   "contracts/genie-airdrop",
+  "contracts/genie-nft",
   "contracts/genie-airdrop-factory",
 ]
+resolver = "2"
 
 [profile.release]
 opt-level = 3
