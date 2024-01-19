@@ -118,7 +118,7 @@ pub fn handle_increase_incentives(
     let status = query_status(deps.as_ref(), &env)?.status;
     if status == Status::Ongoing {
         return Err(StdError::generic_err(
-            "campaign is ongoing and transfer_unclaimed_tokens is not allowed",
+            "campaign is ongoing and handle_increase_incentives is not allowed",
         ));
     }
 
