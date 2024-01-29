@@ -363,12 +363,13 @@ pub fn handle_transfer_unclaimed_tokens(
     }
 
     // query NFT contract for all tokens owned by this contract
+    let limit = limit.unwrap_or(100);
     let ids_to_return: cw721::TokensResponse = deps.querier.query_wasm_smart(
         &config.asset.contract_addr,
         &cw721::Cw721QueryMsg::Tokens {
             owner: env.contract.address.to_string(),
             start_after,
-            limit,
+            limit: Some(limit),
         },
     )?;
 
@@ -397,6 +398,7 @@ pub fn handle_transfer_unclaimed_tokens(
         .current_balance
         .checked_sub(Uint128::from(messages.len() as u128))
         .unwrap_or(Uint128::from(0u128));
+    STATE.save(deps.storage, &state)?;
 
     return Ok(Response::new()
         .add_messages(messages)
