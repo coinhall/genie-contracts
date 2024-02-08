@@ -7,7 +7,7 @@
     "start": "cross-env NODE_OPTIONS=\"--trace-warnings\" DOTENV_CONFIG_PATH=./config/.env tsx -r dotenv/config"
   },
   "dependencies": {
-    "@terra-money/feather.js": "^1.0.0-beta.3",
+    "@terra-money/feather.js": "^2.0.3",
     "@types/node": "^17.0.21",
     "@types/secp256k1": "^4.0.3",
     "axios": "^0.26.0",
